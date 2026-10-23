@@ -16,9 +16,13 @@ const hours = (weekdays: number[], start: string, end: string) =>
 export const MON_FRI = [1, 2, 3, 4, 5];
 export const BILAL_DAYS = [1, 3, 4];
 
-/** Deletes everything, then creates the demo clinic in the given time zone. */
+/**
+ * Deletes everything, then creates the demo clinic in the given time zone.
+ * The audit log is append-only and is never wiped.
+ */
 export async function seedClinic(prisma: PrismaClient, timezone: string) {
-  // Children first, so foreign keys don't block the wipe.
+  // Children first, so foreign keys don't block the wipe. Sessions go with their patients.
+  await prisma.loginCode.deleteMany();
   await prisma.resourceAllocation.deleteMany();
   await prisma.appointment.deleteMany();
   await prisma.patient.deleteMany();
@@ -177,7 +181,12 @@ export async function seedClinic(prisma: PrismaClient, timezone: string) {
   // --- Synthetic patients --------------------------------------------------
   // example.com is reserved for documentation, so these can never be real inboxes.
   const demo = await prisma.patient.create({
-    data: { fullName: 'Demo Patient', email: 'demo.patient@example.com', dateOfBirth: new Date('1990-01-15') },
+    data: {
+      fullName: 'Demo Patient',
+      email: 'demo.patient@example.com',
+      dateOfBirth: new Date('1990-01-15'),
+      isDemo: true,
+    },
   });
   const two = await prisma.patient.create({
     data: { fullName: 'Test Patient Two', email: 'test.two@example.com', dateOfBirth: new Date('1985-06-02') },

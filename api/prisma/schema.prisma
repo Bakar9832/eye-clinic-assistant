@@ -129,18 +129,80 @@ model AppointmentTypeStep {
   @@map("appointment_type_steps")
 }
 
-/// Synthetic patients only.
+/// Synthetic patients only. Created on first login; name and date of birth are
+/// filled in before the first booking.
 model Patient {
   id           String        @id @default(uuid()) @db.Uuid
-  fullName     String        @map("full_name")
+  fullName     String?       @map("full_name")
+  /// Always trimmed and lower-case (CHECK constraint), so one person = one account.
   email        String        @unique
-  dateOfBirth  DateTime      @map("date_of_birth") @db.Date
+  /// Second check before results are shown, so it is never sent back to the client.
+  dateOfBirth  DateTime?     @map("date_of_birth") @db.Date
+  /// The seeded patient behind the "Try as demo patient" button.
+  isDemo       Boolean       @default(false) @map("is_demo")
   /// Display zone the patient chose, so it follows them across devices. Never used for booking maths.
   timezone     String?
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   appointments Appointment[]
+  sessions     Session[]
 
   @@map("patients")
+}
+
+/// A one-time login code. Only a keyed hash is stored; rows are kept for rate limiting.
+model LoginCode {
+  id         String    @id @default(uuid()) @db.Uuid
+  email      String
+  /// HMAC-SHA256(AUTH_SECRET, email:code). Useless without the secret.
+  codeHash   String    @map("code_hash")
+  attempts   Int       @default(0)
+  requestIp  String?   @map("request_ip")
+  createdAt  DateTime  @map("created_at") @db.Timestamptz(3)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
+
+  @@index([email, createdAt])
+  @@index([requestIp, createdAt])
+  @@map("login_codes")
+}
+
+/// A logged-in browser. The cookie holds a random token; only its SHA-256 hash is stored.
+model Session {
+  id         String    @id @default(uuid()) @db.Uuid
+  tokenHash  String    @unique @map("token_hash")
+  patientId  String    @map("patient_id") @db.Uuid
+  patient    Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @map("created_at") @db.Timestamptz(3)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+
+  @@index([patientId])
+  @@map("sessions")
+}
+
+enum AuditActorType {
+  PATIENT
+  STAFF
+  SYSTEM
+}
+
+/// Who did what, when. Append-only (a trigger blocks UPDATE and DELETE).
+/// No foreign keys, so the history survives deleted records.
+/// Never holds login codes, session tokens, dates of birth or doctors' notes.
+model AuditEvent {
+  id         String         @id @default(uuid()) @db.Uuid
+  at         DateTime       @db.Timestamptz(3)
+  actorType  AuditActorType @map("actor_type")
+  actorId    String?        @map("actor_id") @db.Uuid
+  action     String
+  entityType String?        @map("entity_type")
+  entityId   String?        @map("entity_id") @db.Uuid
+  ip         String?
+  details    Json?
+
+  @@index([actorType, actorId, at])
+  @@index([entityType, entityId])
+  @@map("audit_events")
 }
 
 model Appointment {
