@@ -11,6 +11,8 @@ export interface SlotQuery {
   day: string;
   doctorId?: string;
   now?: Date;
+  /** When moving an appointment, its own current holds must not block its new time. */
+  ignoreAppointmentId?: string;
 }
 
 /** Loads one day of the clinic from the database and hands it to computeSlots. */
@@ -18,7 +20,7 @@ export interface SlotQuery {
 export class AvailabilityService {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async getSlots({ typeCode, day, doctorId, now = new Date() }: SlotQuery) {
+  async getSlots({ typeCode, day, doctorId, now = new Date(), ignoreAppointmentId }: SlotQuery) {
     const settings = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !DateTime.fromISO(day, { zone: settings.timezone }).isValid) {
@@ -44,7 +46,14 @@ export class AvailabilityService {
       include: {
         workingHours: true,
         timeOff: { where: { startsAt: { lt: range.lt }, endsAt: { gt: range.gt } } },
-        allocations: { where: { active: true, startsAt: { lt: range.lt }, endsAt: { gt: range.gt } } },
+        allocations: {
+          where: {
+            active: true,
+            startsAt: { lt: range.lt },
+            endsAt: { gt: range.gt },
+            ...(ignoreAppointmentId ? { NOT: { appointmentId: ignoreAppointmentId } } : {}),
+          },
+        },
       },
     });
 

@@ -1,16 +1,18 @@
 // Database tests: run against TEST_DATABASE_URL, which is wiped and re-seeded before each test.
 
 import { seedClinic } from '../../prisma/clinic-data.js';
+import { AuditService } from '../audit/audit.service.js';
 import { AvailabilityService } from '../availability/availability.service.js';
 import { KARACHI, LONG_AGO, MON, local, startTimes } from '../availability/test-fixtures.js';
 import { isOverlapViolation } from '../prisma/db-errors.js';
 import { SchedulingError } from '../scheduling-error.js';
 import { testPrisma } from '../testing-db.js';
+import { SystemClock } from '../clock.js';
 import { BookingService } from './booking.service.js';
 
 const prisma = testPrisma();
 const availability = new AvailabilityService(prisma);
-const booking = new BookingService(prisma, availability);
+const booking = new BookingService(prisma, availability, new AuditService(prisma, new SystemClock()));
 
 let clinic: Awaited<ReturnType<typeof seedClinic>>;
 
@@ -203,6 +205,47 @@ describe('BookingService: concurrency', () => {
       );
 
     expect(isOverlapViolation(error)).toBe(true);
+  });
+});
+
+describe('BookingService.reschedule', () => {
+  it('C3. moving 10:00 → 10:15 with the same doctor works: the appointment does not block itself', async () => {
+    const { ayesha } = clinic.resources;
+    const original = await booking.book(
+      clinic.patients.demo.id,
+      { typeCode: 'ROUTINE_EYE_TEST', start: local(MON, '10:00'), doctorId: ayesha.id },
+      LONG_AGO,
+    );
+
+    // Old exam 10:10-10:30 overlaps the new one 10:25-10:45.
+    const moved = await booking.reschedule(clinic.patients.demo.id, original.id, { start: local(MON, '10:15') }, LONG_AGO);
+
+    expect(moved.startsAt).toEqual(local(MON, '10:15'));
+    expect(moved.reference).toBe(original.reference);
+    expect(moved.allocations.find((a) => a.resourceId === ayesha.id)?.startsAt).toEqual(local(MON, '10:25'));
+  });
+
+  it('C4. two patients race to move into the same slot: exactly one wins, the other keeps their time', async () => {
+    const { ayesha } = clinic.resources;
+    const followUp = (patientId: string, time: string) =>
+      booking.book(patientId, { typeCode: 'FOLLOW_UP', start: local(MON, time), doctorId: ayesha.id }, LONG_AGO);
+    const mine = await followUp(clinic.patients.demo.id, '09:00');
+    const theirs = await followUp(clinic.patients.two.id, '09:15');
+    everyoneLooksFirst(2);
+
+    const results = await Promise.allSettled([
+      booking.reschedule(clinic.patients.demo.id, mine.id, { start: local(MON, '11:00') }, LONG_AGO),
+      booking.reschedule(clinic.patients.two.id, theirs.id, { start: local(MON, '11:00') }, LONG_AGO),
+    ]);
+
+    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+    const loser = results.findIndex((r) => r.status === 'rejected') === 0 ? mine : theirs;
+    const after = await prisma.appointment.findUniqueOrThrow({
+      where: { id: loser.id },
+      include: { allocations: { where: { active: true } } },
+    });
+    expect(after.startsAt).toEqual(loser.startsAt); // untouched
+    expect(after.allocations).toHaveLength(1); // still holding its original time
   });
 });
 

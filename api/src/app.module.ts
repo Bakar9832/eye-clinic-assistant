@@ -13,13 +13,20 @@ import { Clock, SystemClock } from './clock.js';
 import { JsonOnlyMiddleware } from './http/json-only.middleware.js';
 import { createValidationPipe } from './http/validation.pipe.js';
 import { MeController } from './me/me.controller.js';
+import { MyAppointmentsController } from './me/my-appointments.controller.js';
 import { ConsoleEmailSender, EmailSender } from './notifications/email-sender.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { SchedulingErrorFilter } from './scheduling-error.filter.js';
 
 @Module({
   imports: [PrismaModule],
-  controllers: [AppointmentTypesController, AvailabilityController, AuthController, MeController],
+  controllers: [
+    AppointmentTypesController,
+    AvailabilityController,
+    AuthController,
+    MeController,
+    MyAppointmentsController,
+  ],
   providers: [
     AvailabilityService,
     BookingService,

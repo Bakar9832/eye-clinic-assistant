@@ -11,7 +11,9 @@ export type SchedulingErrorCode =
   | 'INVALID_SLOT'
   | 'SLOT_TAKEN'
   | 'NOT_FOUND'
-  | 'NOT_CANCELLABLE';
+  | 'NOT_CANCELLABLE'
+  | 'NOT_CHANGEABLE'
+  | 'PROFILE_INCOMPLETE';
 
 /** A refusal the caller should see, as opposed to a bug. */
 export class SchedulingError extends Error {
