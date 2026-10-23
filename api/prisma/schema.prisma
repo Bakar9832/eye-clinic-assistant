@@ -1,0 +1,180 @@
+// Clinic API schema.
+//
+// Rules Prisma cannot express live in the hand-edited migration SQL:
+// the btree_gist exclusion constraint and CHECK constraints.
+// All timestamps are UTC (timestamptz). Local clinic times are converted using
+// ClinicSetting.timezone.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ResourceKind {
+  OPTOMETRIST
+  TECHNICIAN
+  SCANNER
+}
+
+/// Extra training a resource has. A step can require one.
+/// Technicians: PRETEST, SCAN. Optometrists: CONTACT_LENS, PAEDIATRIC.
+enum Skill {
+  PRETEST
+  SCAN
+  CONTACT_LENS
+  PAEDIATRIC
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CANCELLED
+  COMPLETED
+}
+
+/// Single row (id = 1). Admin-editable later.
+model ClinicSetting {
+  id          Int    @id @default(1)
+  name        String
+  /// IANA zone where the clinic physically is, e.g. "Asia/Karachi".
+  /// Working hours are interpreted in this zone. Viewers see times in their own zone.
+  timezone    String
+  /// Slots start on this grid, in minutes.
+  slotGridMin Int    @default(15) @map("slot_grid_min")
+  /// Clinics differ: whether the agent offers a FOLLOW_UP after a new_prescription outcome.
+  offerRecheckAfterNewPrescription Boolean @default(false) @map("offer_recheck_after_new_prescription")
+
+  @@map("clinic_settings")
+}
+
+/// Anything that can be booked: a staff member or a machine.
+model Resource {
+  id           String               @id @default(uuid()) @db.Uuid
+  kind         ResourceKind
+  displayName  String               @map("display_name")
+  /// Empty for machines. Used to match steps and to break ties (fewer skills first).
+  skills       Skill[]
+  active       Boolean              @default(true)
+  workingHours WorkingHours[]
+  timeOff      TimeOff[]
+  allocations  ResourceAllocation[]
+
+  @@map("resources")
+}
+
+/// A weekly working window in clinic-local time. Several windows per day allow breaks.
+model WorkingHours {
+  id         String   @id @default(uuid()) @db.Uuid
+  resourceId String   @map("resource_id") @db.Uuid
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  /// ISO weekday: 1 = Monday ... 7 = Sunday (matches Luxon).
+  weekday    Int
+  /// Minutes after local midnight, e.g. 540 = 09:00.
+  startMin   Int      @map("start_min")
+  endMin     Int      @map("end_min")
+
+  @@index([resourceId, weekday])
+  @@map("working_hours")
+}
+
+/// One-off absence (leave, maintenance), stored in UTC.
+model TimeOff {
+  id         String   @id @default(uuid()) @db.Uuid
+  resourceId String   @map("resource_id") @db.Uuid
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  startsAt   DateTime @map("starts_at") @db.Timestamptz(3)
+  endsAt     DateTime @map("ends_at") @db.Timestamptz(3)
+  reason     String?
+
+  @@index([resourceId])
+  @@map("time_off")
+}
+
+model AppointmentType {
+  id               String                @id @default(uuid()) @db.Uuid
+  code             String                @unique
+  name             String
+  /// How long the visit usually takes (shown to the patient). The calendar time
+  /// actually blocked is where the last step ends; step lengths include the slack.
+  typicalMin       Int                   @map("typical_min")
+  prepInstructions String                @map("prep_instructions")
+  isUrgent         Boolean               @default(false) @map("is_urgent")
+  active           Boolean               @default(true)
+  steps            AppointmentTypeStep[]
+  appointments     Appointment[]
+
+  @@map("appointment_types")
+}
+
+/// One resource needed during a visit. Rows with the same offset run in parallel
+/// (scan = scanner + skilled technician); later offsets run in sequence.
+/// Every step is fully reserved; none is optional.
+model AppointmentTypeStep {
+  id                String          @id @default(uuid()) @db.Uuid
+  appointmentTypeId String          @map("appointment_type_id") @db.Uuid
+  appointmentType   AppointmentType @relation(fields: [appointmentTypeId], references: [id], onDelete: Cascade)
+  position          Int
+  resourceKind      ResourceKind    @map("resource_kind")
+  /// Only resources with this skill can take the step.
+  requiredSkill     Skill?          @map("required_skill")
+  offsetMin         Int             @map("offset_min")
+  /// Reserved length of this step, slack included. Admin-editable.
+  durationMin       Int             @map("duration_min")
+
+  @@unique([appointmentTypeId, position])
+  @@map("appointment_type_steps")
+}
+
+/// Synthetic patients only.
+model Patient {
+  id           String        @id @default(uuid()) @db.Uuid
+  fullName     String        @map("full_name")
+  email        String        @unique
+  dateOfBirth  DateTime      @map("date_of_birth") @db.Date
+  /// Display zone the patient chose, so it follows them across devices. Never used for booking maths.
+  timezone     String?
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  appointments Appointment[]
+
+  @@map("patients")
+}
+
+model Appointment {
+  id                String               @id @default(uuid()) @db.Uuid
+  /// Booking ticket code, e.g. EC-7K3QFM.
+  reference         String               @unique
+  patientId         String               @map("patient_id") @db.Uuid
+  patient           Patient              @relation(fields: [patientId], references: [id])
+  appointmentTypeId String               @map("appointment_type_id") @db.Uuid
+  appointmentType   AppointmentType      @relation(fields: [appointmentTypeId], references: [id])
+  startsAt          DateTime             @map("starts_at") @db.Timestamptz(3)
+  endsAt            DateTime             @map("ends_at") @db.Timestamptz(3)
+  status            AppointmentStatus    @default(BOOKED)
+  createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  cancelledAt       DateTime?            @map("cancelled_at") @db.Timestamptz(3)
+  allocations       ResourceAllocation[]
+
+  @@index([patientId])
+  @@map("appointments")
+}
+
+/// The time a booking claims on one resource. The exclusion constraint on this
+/// table is what makes double booking impossible.
+model ResourceAllocation {
+  id            String      @id @default(uuid()) @db.Uuid
+  appointmentId String      @map("appointment_id") @db.Uuid
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  resourceId    String      @map("resource_id") @db.Uuid
+  resource      Resource    @relation(fields: [resourceId], references: [id])
+  startsAt      DateTime    @map("starts_at") @db.Timestamptz(3)
+  endsAt        DateTime    @map("ends_at") @db.Timestamptz(3)
+  /// false once the appointment is cancelled; inactive rows stop blocking the slot.
+  active        Boolean     @default(true)
+
+  @@index([appointmentId])
+  @@map("resource_allocations")
+}
