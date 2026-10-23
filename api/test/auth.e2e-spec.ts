@@ -48,10 +48,10 @@ describe('requesting a code', () => {
     expect(row.codeHash).not.toBe(createHash('sha256').update(`${DEMO}:${code}`).digest('hex'));
   });
 
-  it('A8. a 4th code for the same email within 15 minutes is refused', async () => {
-    for (let i = 0; i < 3; i++) await t.http().post('/auth/request-code').send({ email: DEMO }).expect(202);
-    const fourth = await t.http().post('/auth/request-code').send({ email: DEMO }).expect(429);
-    expect(fourth.body.error).toBe('RATE_LIMITED');
+  it('A8. a 6th code for the same email within 15 minutes is refused', async () => {
+    for (let i = 0; i < 5; i++) await t.http().post('/auth/request-code').send({ email: DEMO }).expect(202);
+    const sixth = await t.http().post('/auth/request-code').send({ email: DEMO }).expect(429);
+    expect(sixth.body.error).toBe('RATE_LIMITED');
 
     t.clock.advanceMinutes(16);
     await t.http().post('/auth/request-code').send({ email: DEMO }).expect(202);

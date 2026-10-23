@@ -10,7 +10,7 @@ import { EmailSender } from '../notifications/email-sender.js';
 export const CODE_TTL_MINUTES = 10;
 export const MAX_CODE_ATTEMPTS = 5;
 export const SESSION_DAYS = 7;
-export const CODES_PER_EMAIL = { limit: 3, windowMinutes: 15 };
+export const CODES_PER_EMAIL = { limit: 5, windowMinutes: 15 };
 export const CODES_PER_IP = { limit: 10, windowMinutes: 60 };
 
 const minutes = (n: number) => n * 60_000;
