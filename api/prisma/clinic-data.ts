@@ -130,6 +130,13 @@ export async function seedClinic(prisma: PrismaClient, timezone: string) {
       steps: numbered([exam(0, 15)]),
     },
     {
+      code: 'DOCTOR_CALL',
+      name: 'Doctor call',
+      typicalMin: 10,
+      prepInstructions: 'Phone or video call with the doctor',
+      steps: numbered([exam(0, 15)]),
+    },
+    {
       code: 'SCAN_ONLY',
       name: 'Eye scan',
       typicalMin: 10,

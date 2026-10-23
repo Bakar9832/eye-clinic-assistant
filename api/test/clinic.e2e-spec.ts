@@ -39,7 +39,7 @@ describe('GET /appointment-types', () => {
   it('28. lists every type with steps, lengths and preparation', async () => {
     const res = await request(app.getHttpServer()).get('/appointment-types').expect(200);
 
-    expect(res.body).toHaveLength(7);
+    expect(res.body).toHaveLength(8);
     const withScan = res.body.find((t: { code: string }) => t.code === 'ROUTINE_EYE_TEST_WITH_SCAN');
     expect(withScan).toMatchObject({ typicalMin: 35, calendarMin: 40, isUrgent: false });
     expect(withScan.prepInstructions).toContain('dilated');
