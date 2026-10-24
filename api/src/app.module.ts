@@ -14,10 +14,13 @@ import { JsonOnlyMiddleware } from './http/json-only.middleware.js';
 import { createValidationPipe } from './http/validation.pipe.js';
 import { MeController } from './me/me.controller.js';
 import { MyAppointmentsController } from './me/my-appointments.controller.js';
+import { MyResultsController } from './me/my-results.controller.js';
 import { ConsoleEmailSender, EmailSender } from './notifications/email-sender.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { SchedulingErrorFilter } from './scheduling-error.filter.js';
+import { OutcomesService } from './outcomes/outcomes.service.js';
 import { StaffAuthController } from './staff/staff-auth.controller.js';
+import { StaffClinicController } from './staff/staff-clinic.controller.js';
 import { StaffGuard } from './staff/staff.guard.js';
 
 @Module({
@@ -28,11 +31,14 @@ import { StaffGuard } from './staff/staff.guard.js';
     AuthController,
     MeController,
     MyAppointmentsController,
+    MyResultsController,
     StaffAuthController,
+    StaffClinicController,
   ],
   providers: [
     AvailabilityService,
     BookingService,
+    OutcomesService,
     AuditService,
     AuthService,
     SessionGuard,

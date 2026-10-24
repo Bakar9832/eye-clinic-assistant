@@ -1,0 +1,91 @@
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { IsIn, IsString, Length } from 'class-validator';
+import { DateTime } from 'luxon';
+import { Clock } from '../clock.js';
+import { OutcomeCode, PrismaClient } from '../generated/prisma/client.js';
+import { httpError } from '../http/http-error.js';
+import { OutcomesService } from '../outcomes/outcomes.service.js';
+import { CurrentStaff, Roles, StaffGuard, type StaffActor } from './staff.guard.js';
+
+class OutcomeDto {
+  @IsIn(Object.values(OutcomeCode), { message: `code must be one of ${Object.values(OutcomeCode).join(', ')}` })
+  code!: OutcomeCode;
+
+  /** Passed to the patient word for word, so it is stored exactly as typed. */
+  @IsString()
+  @Length(1, 500)
+  patientNote!: string;
+}
+
+/** The clinic's working day, for staff. */
+@Controller('staff')
+@UseGuards(StaffGuard)
+export class StaffClinicController {
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly outcomes: OutcomesService,
+    private readonly clock: Clock,
+  ) {}
+
+  /** Every appointment on a clinic-local day. Patient names only: no emails, no dates of birth. */
+  @Get('schedule')
+  async schedule(@Query('day') day?: string) {
+    const { timezone } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const start = DateTime.fromISO(day ?? '', { zone: timezone });
+    if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !start.isValid) {
+      throw httpError(HttpStatus.BAD_REQUEST, 'INVALID_DAY', 'Use a date like 2030-01-07.');
+    }
+
+    const appointments = await this.prisma.appointment.findMany({
+      where: { startsAt: { gte: start.toJSDate(), lt: start.plus({ days: 1 }).toJSDate() } },
+      orderBy: { startsAt: 'asc' },
+      include: {
+        patient: { select: { fullName: true } },
+        appointmentType: { select: { code: true, name: true } },
+        allocations: { include: { resource: { select: { kind: true, displayName: true } } } },
+        outcome: { select: { id: true } },
+      },
+    });
+
+    return {
+      day,
+      timezone,
+      appointments: appointments.map((a) => ({
+        id: a.id,
+        reference: a.reference,
+        start: a.startsAt.toISOString(),
+        end: a.endsAt.toISOString(),
+        status: a.status,
+        type: a.appointmentType,
+        patient: { fullName: a.patient.fullName },
+        doctor:
+          a.allocations.find(
+            (x) => x.resource.kind === 'OPTOMETRIST' && x.startsAt >= a.startsAt && x.endsAt <= a.endsAt,
+          )?.resource.displayName ?? null,
+        hasOutcome: a.outcome !== null,
+      })),
+    };
+  }
+
+  @Post('appointments/:id/outcome')
+  @Roles(['DOCTOR'])
+  @HttpCode(HttpStatus.CREATED)
+  async record(@CurrentStaff() doctor: StaffActor, @Param('id') id: string, @Body() body: OutcomeDto) {
+    return toView(await this.outcomes.record(doctor, id, body, this.clock.now()));
+  }
+
+  @Put('appointments/:id/outcome')
+  @Roles(['DOCTOR'])
+  async correct(@CurrentStaff() doctor: StaffActor, @Param('id') id: string, @Body() body: OutcomeDto) {
+    return toView(await this.outcomes.correct(doctor, id, body, this.clock.now()));
+  }
+}
+
+function toView(o: { code: OutcomeCode; patientNote: string; recordedAt: Date; correctedAt: Date | null }) {
+  return {
+    code: o.code,
+    patientNote: o.patientNote,
+    recordedAt: o.recordedAt.toISOString(),
+    correctedAt: o.correctedAt?.toISOString() ?? null,
+  };
+}
