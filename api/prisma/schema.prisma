@@ -173,6 +173,8 @@ model Patient {
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   appointments Appointment[]
   sessions     Session[]
+  conversations Conversation[]
+  handoffs     HandoffRequest[]
 
   @@map("patients")
 }
@@ -289,8 +291,95 @@ model Outcome {
   recordedAt        DateTime    @map("recorded_at") @db.Timestamptz(3)
   /// Set when the doctor corrects it; the patient sees an "edited" tag.
   correctedAt       DateTime?   @map("corrected_at") @db.Timestamptz(3)
+  offersShown       OfferShown[]
 
   @@map("outcomes")
+}
+
+/// Something the clinic can offer after a result, e.g. "Two pairs for $90".
+/// Only offered when the patient's latest outcome is one of appliesTo.
+model Offer {
+  id          String        @id @default(uuid()) @db.Uuid
+  code        String        @unique
+  title       String
+  description String
+  appliesTo   OutcomeCode[] @map("applies_to")
+  active      Boolean       @default(true)
+  shown       OfferShown[]
+
+  @@map("offers")
+}
+
+/// "Made once, never pushed": each offer is shown at most once per outcome.
+model OfferShown {
+  id        String   @id @default(uuid()) @db.Uuid
+  offerId   String   @map("offer_id") @db.Uuid
+  offer     Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  outcomeId String   @map("outcome_id") @db.Uuid
+  outcome   Outcome  @relation(fields: [outcomeId], references: [id], onDelete: Cascade)
+  shownAt   DateTime @map("shown_at") @db.Timestamptz(3)
+
+  @@unique([offerId, outcomeId])
+  @@map("offers_shown")
+}
+
+enum HandoffStatus {
+  OPEN
+  CLOSED
+}
+
+/// The agent passing something to a person: medical questions, complaints, anything unclear.
+model HandoffRequest {
+  id             String        @id @default(uuid()) @db.Uuid
+  /// Empty when the visitor wasn't logged in.
+  patientId      String?       @map("patient_id") @db.Uuid
+  patient        Patient?      @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  conversationId String?       @map("conversation_id") @db.Uuid
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  reason         String
+  status         HandoffStatus @default(OPEN)
+  createdAt      DateTime      @map("created_at") @db.Timestamptz(3)
+
+  @@index([status, createdAt])
+  @@map("handoff_requests")
+}
+
+/// A chat with the agent. Owned by a logged-in patient, or by an anonymous visitor's
+/// browser (a random key in a cookie; only its hash is stored). Kept 30 days.
+model Conversation {
+  id            String           @id @default(uuid()) @db.Uuid
+  patientId     String?          @map("patient_id") @db.Uuid
+  patient       Patient?         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  anonKeyHash   String?          @map("anon_key_hash")
+  createdAt     DateTime         @map("created_at") @db.Timestamptz(3)
+  lastMessageAt DateTime         @map("last_message_at") @db.Timestamptz(3)
+  messages      ChatMessage[]
+  handoffs      HandoffRequest[]
+
+  @@index([patientId])
+  @@index([anonKeyHash])
+  @@map("conversations")
+}
+
+enum ChatRole {
+  USER
+  ASSISTANT
+}
+
+model ChatMessage {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @map("conversation_id") @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           ChatRole
+  text           String
+  /// Shown next to the reply by the web page, never sent to the LLM (e.g. the doctor's note).
+  cards          Json?
+  /// For rate limiting user messages.
+  requestIp      String?      @map("request_ip")
+  createdAt      DateTime     @map("created_at") @db.Timestamptz(3)
+
+  @@index([conversationId, createdAt])
+  @@map("chat_messages")
 }
 
 /// The time a booking claims on one resource. The exclusion constraint on this

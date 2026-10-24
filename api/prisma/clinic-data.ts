@@ -23,6 +23,9 @@ export const BILAL_DAYS = [1, 3, 4];
 export async function seedClinic(prisma: PrismaClient, timezone: string) {
   // Children first, so foreign keys don't block the wipe. Sessions go with their owners.
   await prisma.loginCode.deleteMany();
+  await prisma.handoffRequest.deleteMany();
+  await prisma.conversation.deleteMany();
+  await prisma.offer.deleteMany();
   await prisma.outcome.deleteMany();
   await prisma.resourceAllocation.deleteMany();
   await prisma.appointment.deleteMany();
@@ -195,6 +198,25 @@ export async function seedClinic(prisma: PrismaClient, timezone: string) {
   });
   const three = await prisma.patient.create({
     data: { fullName: 'Test Child Three', email: 'test.three@example.com', dateOfBirth: new Date('2016-09-20') },
+  });
+
+  // --- Offers ---------------------------------------------------------------
+  // Only ever shown when the latest outcome matches, and only once per outcome.
+  await prisma.offer.createMany({
+    data: [
+      {
+        code: 'TWO_PAIRS_90',
+        title: 'Two pairs for $90',
+        description: 'Two pairs of glasses with your new prescription for $90, frames from our standard range.',
+        appliesTo: ['NEW_PRESCRIPTION'],
+      },
+      {
+        code: 'LENS_TRIAL',
+        title: 'Free contact lens trial',
+        description: 'Try daily contact lenses in your new prescription for two weeks, free.',
+        appliesTo: ['NEW_PRESCRIPTION'],
+      },
+    ],
   });
 
   // --- Staff logins ---------------------------------------------------------
