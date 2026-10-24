@@ -32,7 +32,11 @@ export function ChatPage() {
     setBubbles([]);
   }, [storageKey]);
 
-  useEffect(() => end.current?.scrollIntoView?.({ behavior: 'smooth' }), [bubbles]);
+  // A block body on purpose: an effect's return value is its clean-up function, and
+  // modern browsers return a Promise from smooth scrolling. Returning it crashed the page.
+  useEffect(() => {
+    void end.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [bubbles]);
 
   async function send(text: string) {
     if (!text.trim() || busy) return;
