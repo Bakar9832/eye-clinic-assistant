@@ -1,0 +1,28 @@
+[project]
+name = "eye-agent"
+version = "0.1.0"
+description = "The Eye Clinic Assistant's agent: an LLM loop that acts through the clinic's MCP tools."
+requires-python = ">=3.12"
+# Exact versions, so the laptop and the PC install the same thing.
+dependencies = [
+    "fastapi==0.143.0",
+    "uvicorn==0.54.0",
+    "openai==3.28.0",
+    "mcp==2.3.0",
+    "pydantic-settings==2.15.0",
+    "httpx==0.28.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.1.1", "pytest-asyncio==1.4.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

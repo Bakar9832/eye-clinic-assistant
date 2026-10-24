@@ -24,11 +24,25 @@ export interface ToolResult {
   isError?: boolean;
 }
 
-const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD in clinic time');
-const TIME = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'HH:MM, 24-hour, in clinic time');
-const TYPE = z.string().regex(/^[A-Z_]{1,50}$/, 'an appointment type code from list_appointment_types');
+// Each format is both checked (regex) and described: some model providers drop regex
+// patterns from tool schemas, so the description is what tells the model the format.
+const DATE = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD in clinic time')
+  .describe('A date in clinic time, YYYY-MM-DD, e.g. 2030-01-07.');
+const TIME = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'HH:MM, 24-hour, in clinic time')
+  .describe('A time in clinic time, 24-hour HH:MM, e.g. 09:30.');
+const TYPE = z
+  .string()
+  .regex(/^[A-Z_]{1,50}$/, 'an appointment type code from list_appointment_types')
+  .describe('An appointment type code from list_appointment_types, e.g. ROUTINE_EYE_TEST.');
 const DOCTOR = z.string().min(2).max(60).describe('Doctor name, e.g. "Dr Ayesha". Leave out for any doctor.');
-const REFERENCE = z.string().regex(/^EC-[A-Z0-9]{6}$/, 'a booking reference like EC-7K3QFM');
+const REFERENCE = z
+  .string()
+  .regex(/^EC-[A-Z0-9]{6}$/, 'a booking reference like EC-7K3QFM')
+  .describe("A booking reference from the patient's appointments, e.g. EC-7K3QFM.");
 
 /**
  * Every tool's input. Strict objects: unknown fields (patientId, ...) are rejected, not
