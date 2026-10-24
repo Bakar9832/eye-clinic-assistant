@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DEMO, mockApi, renderApp } from '../test/render';
 import { DOB_CONFIRMED_MESSAGE } from './ChatPage';
@@ -87,6 +87,9 @@ describe('the chat', () => {
     mockApi({});
     renderApp('/');
     await waitFor(() => expect(screen.getByText('Chatting as a guest:')).toBeInTheDocument());
-    expect(screen.getByRole('link', { name: 'Log in' }).closest('p')).toHaveTextContent('to book or see your results.');
+    // The note has its own "Log in" link (the header has another).
+    const note = screen.getByText('Chatting as a guest:').closest('p')!;
+    expect(note).toHaveTextContent('Chatting as a guest: ask about appointments and when doctors are free. Log in to book or see your results.');
+    expect(within(note).getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login');
   });
 });
