@@ -118,6 +118,19 @@ export class AdminController {
     }));
   }
 
+  @Get('settings')
+  @Roles(['ADMIN'])
+  async settings() {
+    const s = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    return {
+      name: s.name,
+      timezone: s.timezone,
+      slotGridMin: s.slotGridMin,
+      offerRecheckAfterNewPrescription: s.offerRecheckAfterNewPrescription,
+      outcomeEditWindowHours: s.outcomeEditWindowHours,
+    };
+  }
+
   @Patch('settings')
   @Roles(['ADMIN'])
   updateSettings(@CurrentStaff() admin: StaffActor, @Body() body: SettingsDto) {
@@ -160,6 +173,14 @@ export class AdminController {
     if (!/^[0-9a-f-]{36}$/i.test(id)) throw httpError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Resource not found.');
     const timeOff = await this.admin.addTimeOff(admin, id, new Date(body.start), new Date(body.end), body.reason);
     return { id: timeOff.id, start: timeOff.startsAt.toISOString(), end: timeOff.endsAt.toISOString() };
+  }
+
+  /** Staff accounts, for switching them on and off. */
+  @Get('users')
+  @Roles(['ADMIN'])
+  async staffUsers() {
+    const users = await this.prisma.staffUser.findMany({ orderBy: [{ role: 'asc' }, { displayName: 'asc' }] });
+    return users.map((u) => ({ id: u.id, email: u.email, displayName: u.displayName, role: u.role, active: u.active }));
   }
 
   @Patch('users/:id')

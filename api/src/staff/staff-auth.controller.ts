@@ -65,6 +65,6 @@ export class StaffAuthController {
   @UseGuards(StaffGuard)
   async me(@CurrentStaff() staff: StaffActor) {
     const user = await this.prisma.staffUser.findUniqueOrThrow({ where: { id: staff.id } });
-    return { email: user.email, displayName: user.displayName, role: user.role };
+    return { id: user.id, email: user.email, displayName: user.displayName, role: user.role };
   }
 }

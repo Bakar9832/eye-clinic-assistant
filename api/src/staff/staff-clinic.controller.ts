@@ -29,7 +29,7 @@ export class StaffClinicController {
 
   /** Every appointment on a clinic-local day. Patient names only: no emails, no dates of birth. */
   @Get('schedule')
-  async schedule(@Query('day') day?: string) {
+  async schedule(@CurrentStaff() staff: StaffActor, @Query('day') day?: string) {
     const { timezone } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
     const start = DateTime.fromISO(day ?? '', { zone: timezone });
     if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !start.isValid) {
@@ -42,7 +42,7 @@ export class StaffClinicController {
       include: {
         patient: { select: { fullName: true } },
         appointmentType: { select: { code: true, name: true } },
-        allocations: { include: { resource: { select: { kind: true, displayName: true } } } },
+        allocations: { include: { resource: { select: { id: true, kind: true, displayName: true } } } },
         outcome: { select: { id: true } },
       },
     });
@@ -58,10 +58,9 @@ export class StaffClinicController {
         status: a.status,
         type: a.appointmentType,
         patient: { fullName: a.patient.fullName },
-        doctor:
-          a.allocations.find(
-            (x) => x.resource.kind === 'OPTOMETRIST' && x.startsAt >= a.startsAt && x.endsAt <= a.endsAt,
-          )?.resource.displayName ?? null,
+        doctor: examOf(a)?.displayName ?? null,
+        // For a doctor: is this one of their own exams (the only ones they may record)?
+        examinedByMe: staff.resourceId !== null && examOf(a)?.id === staff.resourceId,
         hasOutcome: a.outcome !== null,
       })),
     };
@@ -97,6 +96,18 @@ export class StaffClinicController {
     return { id, status: 'CLOSED' };
   }
 
+  /** A doctor reads the outcome of their own exam, to correct it. */
+  @Get('appointments/:id/outcome')
+  @Roles(['DOCTOR'])
+  async read(@CurrentStaff() doctor: StaffActor, @Param('id') id: string) {
+    const { outcome, editableUntil } = await this.outcomes.forCorrection(doctor, id);
+    return {
+      ...toView(outcome),
+      editableUntil: editableUntil.toISOString(),
+      editable: this.clock.now() <= editableUntil,
+    };
+  }
+
   @Post('appointments/:id/outcome')
   @Roles(['DOCTOR'])
   @HttpCode(HttpStatus.CREATED)
@@ -118,4 +129,14 @@ function toView(o: { code: OutcomeCode; patientNote: string; recordedAt: Date; c
     recordedAt: o.recordedAt.toISOString(),
     correctedAt: o.correctedAt?.toISOString() ?? null,
   };
+}
+
+/** The doctor for the appointment's current time (older holds remain from reschedules). */
+function examOf(a: {
+  startsAt: Date;
+  endsAt: Date;
+  allocations: { startsAt: Date; endsAt: Date; resource: { id: string; kind: string; displayName: string } }[];
+}) {
+  return a.allocations.find((x) => x.resource.kind === 'OPTOMETRIST' && x.startsAt >= a.startsAt && x.endsAt <= a.endsAt)
+    ?.resource;
 }

@@ -47,7 +47,7 @@ describe('staff login', () => {
     expect(cookie).toMatch(/Path=\/staff/);
 
     const me = await browser.get('/staff/me').expect(200);
-    expect(me.body).toEqual({ email: DR_AYESHA, displayName: 'Dr Ayesha', role: 'DOCTOR' });
+    expect(me.body).toEqual({ id: clinic.staff.drAyesha.id, email: DR_AYESHA, displayName: 'Dr Ayesha', role: 'DOCTOR' });
   });
 
   it('a patient login code does not open the staff door, and the other way round', async () => {

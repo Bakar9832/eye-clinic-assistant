@@ -90,6 +90,22 @@ describe('the schedule', () => {
     expect(body).not.toContain('1990-01-15');
   });
 
+  it("marks a doctor's own exams, so the page only offers outcomes there", async () => {
+    await bookFollowUp('ayesha', '09:00');
+    await bookFollowUp('bilal', '12:00');
+
+    const ayesha = await staffLogin(t, 'dr.ayesha@clinic.example');
+    const mine = (await ayesha.get('/staff/schedule').query({ day: DAY }).expect(200)).body.appointments;
+    expect(mine.map((a: { doctor: string; examinedByMe: boolean }) => [a.doctor, a.examinedByMe])).toEqual([
+      ['Dr Ayesha', true],
+      ['Dr Bilal', false],
+    ]);
+
+    const reception = await staffLogin(t, 'reception@clinic.example');
+    const theirs = (await reception.get('/staff/schedule').query({ day: DAY }).expect(200)).body.appointments;
+    expect(theirs.every((a: { examinedByMe: boolean }) => a.examinedByMe === false)).toBe(true);
+  });
+
   it('rejects a missing or malformed day', async () => {
     const reception = await staffLogin(t, 'reception@clinic.example');
     await reception.get('/staff/schedule').expect(400);
@@ -226,6 +242,28 @@ describe('correcting an outcome', () => {
     t.clock.advanceMinutes(3 * 60);
     const res = await ayesha.put(`/staff/appointments/${id}/outcome`).send(outcome('NO_CHANGE', 'Second fix.')).expect(409);
     expect(res.body.error).toBe('EDIT_WINDOW_CLOSED');
+  });
+
+  it('the recording doctor can read it back to correct it, with the deadline; nobody else can', async () => {
+    const { id, ayesha } = await recorded();
+
+    const res = await ayesha.get(`/staff/appointments/${id}/outcome`).expect(200);
+    expect(res.body).toMatchObject({
+      code: 'NO_CHANGE',
+      patientNote: NOTE,
+      correctedAt: null,
+      editable: true,
+      editableUntil: new Date(local('09:20').getTime() + 72 * 3_600_000).toISOString(),
+    });
+
+    t.clock.advanceMinutes(73 * 60);
+    const later = await staffLogin(t, 'dr.ayesha@clinic.example');
+    expect((await later.get(`/staff/appointments/${id}/outcome`).expect(200)).body.editable).toBe(false);
+
+    const bilal = await staffLogin(t, 'dr.bilal@clinic.example');
+    await bilal.get(`/staff/appointments/${id}/outcome`).expect(403);
+    const reception = await staffLogin(t, 'reception@clinic.example');
+    await reception.get(`/staff/appointments/${id}/outcome`).expect(403);
   });
 
   it('the edit window is a clinic setting', async () => {

@@ -71,6 +71,18 @@ describe('E1. clinic settings', () => {
     expect(slots.body.slots[0].start).toBe(at('09:00', MON, 'Europe/London'));
   });
 
+  it('admins can read the current settings; reception cannot', async () => {
+    const res = await (await admin()).get('/staff/settings').expect(200);
+    expect(res.body).toEqual({
+      name: 'Demo Eye Clinic',
+      timezone: ZONE,
+      slotGridMin: 15,
+      offerRecheckAfterNewPrescription: false,
+      outcomeEditWindowHours: 72,
+    });
+    await (await staffLogin(t, 'reception@clinic.example')).get('/staff/settings').expect(403);
+  });
+
   it('bad values are refused', async () => {
     const browser = await admin();
     await browser.patch('/staff/settings').send({ timezone: 'Mars/Olympus' }).expect(400);
@@ -183,6 +195,17 @@ describe('E6. staff accounts', () => {
     const reception = await staffLogin(t, 'reception@clinic.example');
     await (await admin()).patch(`/staff/users/${clinic.staff.reception.id}`).send({ active: false }).expect(200);
     await reception.get('/staff/me').expect(401);
+  });
+
+  it('admins can list staff accounts; others cannot', async () => {
+    const res = await (await admin()).get('/staff/users').expect(200);
+    expect(res.body.map((u: { email: string; role: string; active: boolean }) => [u.email, u.role, u.active])).toEqual([
+      ['dr.ayesha@clinic.example', 'DOCTOR', true],
+      ['dr.bilal@clinic.example', 'DOCTOR', true],
+      ['reception@clinic.example', 'RECEPTION', true],
+      ['admin@clinic.example', 'ADMIN', true],
+    ]);
+    await (await staffLogin(t, 'reception@clinic.example')).get('/staff/users').expect(403);
   });
 
   it("an admin can't switch off their own account", async () => {

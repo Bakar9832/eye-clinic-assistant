@@ -54,17 +54,22 @@ export class OutcomesService {
     });
   }
 
-  async correct(doctor: StaffActor, appointmentId: string, input: OutcomeInput, now: Date) {
+  /** The outcome of this doctor's own exam, and until when they may still correct it. */
+  async forCorrection(doctor: StaffActor, appointmentId: string) {
     await this.ownExam(doctor, appointmentId);
     const outcome = await this.prisma.outcome.findUnique({ where: { appointmentId } });
     if (!outcome) throw httpError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'No outcome has been recorded yet.');
     if (outcome.recordedByStaffId !== doctor.id) {
       throw httpError(HttpStatus.FORBIDDEN, 'NOT_YOUR_OUTCOME', 'Only the doctor who recorded it can correct it.');
     }
-
     // Measured from the first recording, so corrections can't keep the window open.
     const { outcomeEditWindowHours } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
-    if (now.getTime() > outcome.recordedAt.getTime() + outcomeEditWindowHours * 3_600_000) {
+    return { outcome, outcomeEditWindowHours, editableUntil: new Date(outcome.recordedAt.getTime() + outcomeEditWindowHours * 3_600_000) };
+  }
+
+  async correct(doctor: StaffActor, appointmentId: string, input: OutcomeInput, now: Date) {
+    const { outcomeEditWindowHours, editableUntil } = await this.forCorrection(doctor, appointmentId);
+    if (now > editableUntil) {
       throw httpError(
         HttpStatus.CONFLICT,
         'EDIT_WINDOW_CLOSED',
