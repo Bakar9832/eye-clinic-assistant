@@ -12,6 +12,7 @@ const STATUS: Record<SchedulingErrorCode, HttpStatus> = {
   NOT_CANCELLABLE: HttpStatus.CONFLICT,
   NOT_CHANGEABLE: HttpStatus.CONFLICT,
   PROFILE_INCOMPLETE: HttpStatus.FORBIDDEN,
+  OVERRIDE_REQUIRED: HttpStatus.CONFLICT,
 };
 
 /** Turns a SchedulingError into a JSON response with its reasons. */

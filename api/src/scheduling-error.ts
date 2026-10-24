@@ -13,7 +13,8 @@ export type SchedulingErrorCode =
   | 'NOT_FOUND'
   | 'NOT_CANCELLABLE'
   | 'NOT_CHANGEABLE'
-  | 'PROFILE_INCOMPLETE';
+  | 'PROFILE_INCOMPLETE'
+  | 'OVERRIDE_REQUIRED';
 
 /** A refusal the caller should see, as opposed to a bug. */
 export class SchedulingError extends Error {

@@ -20,6 +20,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { SchedulingErrorFilter } from './scheduling-error.filter.js';
 import { OutcomesService } from './outcomes/outcomes.service.js';
 import { StaffAuthController } from './staff/staff-auth.controller.js';
+import { StaffBookingsController } from './staff/staff-bookings.controller.js';
 import { StaffClinicController } from './staff/staff-clinic.controller.js';
 import { StaffGuard } from './staff/staff.guard.js';
 
@@ -34,6 +35,7 @@ import { StaffGuard } from './staff/staff.guard.js';
     MyResultsController,
     StaffAuthController,
     StaffClinicController,
+    StaffBookingsController,
   ],
   providers: [
     AvailabilityService,

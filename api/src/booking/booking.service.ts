@@ -3,7 +3,7 @@ import { DateTime } from 'luxon';
 import { AuditService, SYSTEM, type Actor } from '../audit/audit.service.js';
 import { AvailabilityService, type SlotQuery } from '../availability/availability.service.js';
 import type { Slot } from '../availability/types.js';
-import { PrismaClient } from '../generated/prisma/client.js';
+import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
 import { isOverlapViolation, isUniqueViolation } from '../prisma/db-errors.js';
 import { SchedulingError, type Reason } from '../scheduling-error.js';
 import { generateReference } from './reference.js';
@@ -13,6 +13,11 @@ export interface BookingRequest {
   /** The start time the patient chose. The end is never taken from the caller. */
   start: Date;
   doctorId?: string;
+}
+
+export interface StaffBookingRequest extends BookingRequest {
+  /** Present = staff accept breaking the soft rules listed in the warning, for this reason. */
+  override?: { reason: string };
 }
 
 export interface RescheduleRequest {
@@ -40,15 +45,56 @@ export class BookingService {
   ) {}
 
   async book(patientId: string, request: BookingRequest, now = new Date(), actor: Actor = SYSTEM) {
-    const patient = await this.prisma.patient.findUniqueOrThrow({ where: { id: patientId } });
-    if (patient.fullName === null || patient.dateOfBirth === null) {
-      throw new SchedulingError('PROFILE_INCOMPLETE', [
-        { code: 'PROFILE_INCOMPLETE', message: 'Please add your name and date of birth before booking.' },
-      ]);
-    }
-
+    await this.requireCompleteProfile(patientId);
     const query = { typeCode: request.typeCode, day: await this.clinicDay(request.start), doctorId: request.doctorId, now };
     return this.placeOnSlot(query, request.start, now, (slot, typeId) => this.createAppointment(patientId, typeId, slot, actor));
+  }
+
+  /**
+   * Reception or an admin books for a patient. Within the rules it's an ordinary booking.
+   * Outside them, only soft rules (working hours, the grid) can be bent, and only when
+   * the request carries override.reason after staff have seen the warnings. Hard rules
+   * (other bookings, leave, skills, the past, midnight) are never bent, and the database
+   * still refuses any overlap.
+   */
+  async bookByStaff(patientId: string, request: StaffBookingRequest, now: Date, actor: Actor) {
+    await this.requireCompleteProfile(patientId);
+    if (request.start < now) {
+      throw new SchedulingError('INVALID_SLOT', [{ code: 'IN_THE_PAST', message: 'That time has already passed.' }]);
+    }
+    const query = { typeCode: request.typeCode, day: await this.clinicDay(request.start), doctorId: request.doctorId, now };
+
+    try {
+      return await this.placeOnSlot(query, request.start, now, (slot, typeId) =>
+        this.createAppointment(patientId, typeId, slot, actor),
+      );
+    } catch (error) {
+      if (!(error instanceof SchedulingError && error.code === 'INVALID_SLOT')) throw error;
+    }
+
+    const { type, slot, warnings } = await this.availability.overrideAt(query, request.start);
+    if (!slot) {
+      throw new SchedulingError('INVALID_SLOT', [
+        {
+          code: 'NOT_AVAILABLE',
+          message:
+            'Not possible even with an override: someone needed is on leave, busy, not qualified, ' +
+            'or the visit would run past midnight.',
+        },
+      ]);
+    }
+    if (!request.override) throw new SchedulingError('OVERRIDE_REQUIRED', warnings);
+
+    try {
+      return await this.createAppointment(patientId, type.id, slot, actor, {
+        override: true,
+        reason: request.override.reason,
+        warnings: warnings.map((w) => w.message),
+      });
+    } catch (error) {
+      if (isOverlapViolation(error)) throw slotTaken();
+      throw error;
+    }
   }
 
   /**
@@ -177,6 +223,16 @@ export class BookingService {
     }
   }
 
+  private async requireCompleteProfile(patientId: string) {
+    const patient = await this.prisma.patient.findUnique({ where: { id: patientId } });
+    if (!patient) throw new SchedulingError('NOT_FOUND', [{ code: 'NOT_FOUND', message: 'Patient not found.' }]);
+    if (patient.fullName === null || patient.dateOfBirth === null) {
+      throw new SchedulingError('PROFILE_INCOMPLETE', [
+        { code: 'PROFILE_INCOMPLETE', message: 'Please add your name and date of birth before booking.' },
+      ]);
+    }
+  }
+
   /** The clinic-local day a start time falls on. */
   private async clinicDay(start: Date) {
     const { timezone } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
@@ -184,7 +240,13 @@ export class BookingService {
   }
 
   /** The appointment, all its allocations and the audit entry: saved together or not at all. */
-  private async createAppointment(patientId: string, appointmentTypeId: string, slot: Slot, actor: Actor) {
+  private async createAppointment(
+    patientId: string,
+    appointmentTypeId: string,
+    slot: Slot,
+    actor: Actor,
+    details?: Prisma.InputJsonObject,
+  ) {
     for (let tries = 0; ; tries++) {
       try {
         return await this.prisma.$transaction(async (tx) => {
@@ -202,7 +264,7 @@ export class BookingService {
             include: { allocations: true },
           });
           await this.audit.record(
-            { actor, action: 'APPOINTMENT_BOOKED', entityType: 'Appointment', entityId: appointment.id },
+            { actor, action: 'APPOINTMENT_BOOKED', entityType: 'Appointment', entityId: appointment.id, details },
             tx,
           );
           return appointment;

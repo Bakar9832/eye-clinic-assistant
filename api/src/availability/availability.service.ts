@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import { PrismaClient } from '../generated/prisma/client.js';
-import { SchedulingError } from '../scheduling-error.js';
-import { computeSlots } from './compute-slots.js';
-import type { Slot, SlotResource } from './types.js';
+import { SchedulingError, type Reason } from '../scheduling-error.js';
+import { computeSlots, slotIgnoringHours } from './compute-slots.js';
+import type { ComputeSlotsInput, Slot, SlotResource } from './types.js';
 
 export interface SlotQuery {
   typeCode: string;
@@ -15,12 +15,54 @@ export interface SlotQuery {
   ignoreAppointmentId?: string;
 }
 
-/** Loads one day of the clinic from the database and hands it to computeSlots. */
+/** Loads one day of the clinic from the database and hands it to the slot calculation. */
 @Injectable()
 export class AvailabilityService {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async getSlots({ typeCode, day, doctorId, now = new Date(), ignoreAppointmentId }: SlotQuery) {
+  async getSlots(query: SlotQuery) {
+    const { settings, type, input, names } = await this.loadDay(query);
+    const slots: Slot[] = computeSlots(input);
+    return { settings, type, slots, names };
+  }
+
+  /**
+   * For a staff override: the slot at exactly `start` with working hours and the grid
+   * ignored, plus the soft rules it breaks, in words. slot is null when a hard rule
+   * (leave, another booking, skills, midnight) still stands in the way.
+   */
+  async overrideAt(query: SlotQuery, start: Date) {
+    const { settings, type, input, names, resources } = await this.loadDay(query);
+    const local = DateTime.fromJSDate(start, { zone: settings.timezone });
+    const warnings: Reason[] = [];
+    // Even an override books whole minutes.
+    const slot =
+      local.second === 0 && local.millisecond === 0 ? slotIgnoringHours(input, local.hour * 60 + local.minute) : null;
+    if (!slot) return { settings, type, slot, warnings };
+
+    if (local.minute % settings.slotGridMin !== 0) {
+      warnings.push({ code: 'NOT_ON_GRID', message: `Starts off the ${settings.slotGridMin}-minute grid.` });
+    }
+    for (const a of slot.assignments) {
+      const resource = resources.find((r) => r.id === a.resourceId)!;
+      const from = DateTime.fromJSDate(a.start, { zone: settings.timezone });
+      const to = DateTime.fromJSDate(a.end, { zone: settings.timezone });
+      const fromMin = from.hour * 60 + from.minute;
+      const toMin = fromMin + to.diff(from, 'minutes').minutes;
+      const inHours = resource.workingHours.some(
+        (w) => w.weekday === local.weekday && w.startMin <= fromMin && toMin <= w.endMin,
+      );
+      if (!inHours) {
+        warnings.push({
+          code: 'OUTSIDE_WORKING_HOURS',
+          message: `${names.get(a.resourceId)!.displayName}: ${from.toFormat('HH:mm')}-${to.toFormat('HH:mm')} is outside their working hours.`,
+        });
+      }
+    }
+    return { settings, type, slot, warnings };
+  }
+
+  private async loadDay({ typeCode, day, doctorId, now = new Date(), ignoreAppointmentId }: SlotQuery) {
     const settings = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !DateTime.fromISO(day, { zone: settings.timezone }).isValid) {
@@ -72,7 +114,7 @@ export class AvailabilityService {
       appointmentsToday: new Set(r.allocations.map((a) => a.appointmentId)).size,
     }));
 
-    const slots: Slot[] = computeSlots({
+    const input: ComputeSlotsInput = {
       steps: type.steps,
       resources,
       day,
@@ -80,9 +122,8 @@ export class AvailabilityService {
       gridMin: settings.slotGridMin,
       doctorId,
       now,
-    });
-
+    };
     const names = new Map(rows.map((r) => [r.id, { displayName: r.displayName, kind: r.kind }]));
-    return { settings, type, slots, names };
+    return { settings, type, input, names, resources };
   }
 }
