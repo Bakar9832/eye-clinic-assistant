@@ -67,6 +67,36 @@ export class StaffClinicController {
     };
   }
 
+  /** What the agent passed to a person, newest first. Open ones by default. */
+  @Get('handoffs')
+  async handoffs(@Query('status') status?: string) {
+    const requests = await this.prisma.handoffRequest.findMany({
+      where: { status: status === 'CLOSED' ? 'CLOSED' : 'OPEN' },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { patient: { select: { fullName: true, email: true } } },
+    });
+    return requests.map((h) => ({
+      id: h.id,
+      reason: h.reason,
+      status: h.status,
+      createdAt: h.createdAt.toISOString(),
+      conversationId: h.conversationId,
+      // Anonymous visitors have no account; staff answer them via the conversation.
+      patient: h.patient ? { fullName: h.patient.fullName, email: h.patient.email } : null,
+    }));
+  }
+
+  @Post('handoffs/:id/close')
+  @HttpCode(HttpStatus.OK)
+  async closeHandoff(@Param('id') id: string) {
+    const { count } = /^[0-9a-f-]{36}$/i.test(id)
+      ? await this.prisma.handoffRequest.updateMany({ where: { id, status: 'OPEN' }, data: { status: 'CLOSED' } })
+      : { count: 0 };
+    if (count === 0) throw httpError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'No open handoff with that id.');
+    return { id, status: 'CLOSED' };
+  }
+
   @Post('appointments/:id/outcome')
   @Roles(['DOCTOR'])
   @HttpCode(HttpStatus.CREATED)

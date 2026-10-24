@@ -6,10 +6,8 @@ import { CurrentPatient, SessionGuard, type PatientActor } from '../auth/session
 import { Clock } from '../clock.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
-import { OutcomesService } from '../outcomes/outcomes.service.js';
+import { DOB_UNLOCK_MINUTES, ResultsService } from '../results/results.service.js';
 
-/** How long a passed date-of-birth check unlocks results in this session. */
-export const DOB_UNLOCK_MINUTES = 15;
 /** Wrong dates of birth before the session is ended. */
 export const MAX_DOB_ATTEMPTS = 5;
 
@@ -29,7 +27,7 @@ class VerifyDobDto {
 export class MyResultsController {
   constructor(
     private readonly prisma: PrismaClient,
-    private readonly outcomes: OutcomesService,
+    private readonly results: ResultsService,
     private readonly auth: AuthService,
     private readonly audit: AuditService,
     private readonly clock: Clock,
@@ -69,27 +67,10 @@ export class MyResultsController {
   /** The latest result: the outcome code and the doctor's note, word for word. Nothing else. */
   @Get('outcome')
   async latestOutcome(@CurrentPatient() me: PatientActor) {
-    const session = await this.prisma.session.findUniqueOrThrow({ where: { id: me.sessionId } });
-    const unlockedUntil = (session.dobVerifiedAt?.getTime() ?? 0) + DOB_UNLOCK_MINUTES * 60_000;
     // Even "no results yet" needs the check, so nothing at all leaks without it.
-    if (this.clock.now().getTime() > unlockedUntil) {
+    if (!(await this.results.isUnlocked(me.sessionId))) {
       throw httpError(HttpStatus.FORBIDDEN, 'DOB_REQUIRED', 'Please confirm your date of birth to see results.');
     }
-
-    const outcome = await this.outcomes.latestFor(me.id);
-    await this.audit.record({ actor: me, action: 'RESULTS_VIEWED', details: { found: outcome !== null } });
-    if (!outcome) return { status: 'NOT_READY' };
-
-    return {
-      status: 'READY',
-      outcome: outcome.code,
-      doctorNote: outcome.patientNote,
-      doctorName: outcome.recordedBy.displayName,
-      appointment: { date: outcome.appointment.startsAt.toISOString(), type: outcome.appointment.appointmentType.name },
-      recordedAt: outcome.recordedAt.toISOString(),
-      // The patient is told when a doctor has corrected a result.
-      edited: outcome.correctedAt !== null,
-      editedAt: outcome.correctedAt?.toISOString() ?? null,
-    };
+    return this.results.latest(me.id, me);
   }
 }

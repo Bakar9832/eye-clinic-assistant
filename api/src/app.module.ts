@@ -2,6 +2,13 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
 import { AdminController } from './admin/admin.controller.js';
+import { AgentTokenService } from './agent/agent-token.service.js';
+import { AgentClient, HttpAgentClient } from './chat/agent-client.js';
+import { ChatController } from './chat/chat.controller.js';
+import { ClinicToolsService } from './mcp/clinic-tools.service.js';
+import { McpController } from './mcp/mcp.controller.js';
+import { OffersService } from './offers/offers.service.js';
+import { ResultsService } from './results/results.service.js';
 import { AdminService } from './admin/admin.service.js';
 import { AppointmentTypesController } from './appointment-types/appointment-types.controller.js';
 import { AuditService } from './audit/audit.service.js';
@@ -39,12 +46,18 @@ import { StaffGuard } from './staff/staff.guard.js';
     StaffClinicController,
     StaffBookingsController,
     AdminController,
+    McpController,
+    ChatController,
   ],
   providers: [
     AvailabilityService,
     BookingService,
     OutcomesService,
     AdminService,
+    AgentTokenService,
+    ResultsService,
+    OffersService,
+    ClinicToolsService,
     AuditService,
     AuthService,
     SessionGuard,
@@ -52,6 +65,7 @@ import { StaffGuard } from './staff/staff.guard.js';
     // Swapped for fakes in tests.
     { provide: Clock, useClass: SystemClock },
     { provide: EmailSender, useClass: ConsoleEmailSender },
+    { provide: AgentClient, useClass: HttpAgentClient },
     { provide: APP_FILTER, useClass: SchedulingErrorFilter },
     { provide: APP_PIPE, useFactory: createValidationPipe },
   ],
