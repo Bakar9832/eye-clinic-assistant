@@ -35,6 +35,21 @@ afterAll(async () => {
   await app.close();
 });
 
+describe('GET /clinic', () => {
+  it("tells the page the clinic's name and time zone, without login", async () => {
+    const res = await request(app.getHttpServer()).get('/clinic').expect(200);
+    expect(res.body).toEqual({
+      name: 'Demo Eye Clinic',
+      timezone: ZONE,
+      slotGridMin: 15,
+      doctors: [
+        { id: clinic.resources.ayesha.id, displayName: 'Dr Ayesha', skills: ['PAEDIATRIC'] },
+        { id: clinic.resources.bilal.id, displayName: 'Dr Bilal', skills: ['CONTACT_LENS'] },
+      ],
+    });
+  });
+});
+
 describe('GET /appointment-types', () => {
   it('28. lists every type with steps, lengths and preparation', async () => {
     const res = await request(app.getHttpServer()).get('/appointment-types').expect(200);

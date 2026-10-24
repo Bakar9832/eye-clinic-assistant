@@ -11,6 +11,7 @@ import { OffersService } from './offers/offers.service.js';
 import { ResultsService } from './results/results.service.js';
 import { AdminService } from './admin/admin.service.js';
 import { AppointmentTypesController } from './appointment-types/appointment-types.controller.js';
+import { ClinicController } from './appointment-types/clinic.controller.js';
 import { AuditService } from './audit/audit.service.js';
 import { AuthController } from './auth/auth.controller.js';
 import { AuthService } from './auth/auth.service.js';
@@ -36,6 +37,7 @@ import { StaffGuard } from './staff/staff.guard.js';
 @Module({
   imports: [PrismaModule],
   controllers: [
+    ClinicController,
     AppointmentTypesController,
     AvailabilityController,
     AuthController,
