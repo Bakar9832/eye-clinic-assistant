@@ -47,6 +47,8 @@ model ClinicSetting {
   slotGridMin Int    @default(15) @map("slot_grid_min")
   /// Clinics differ: whether the agent offers a FOLLOW_UP after a new_prescription outcome.
   offerRecheckAfterNewPrescription Boolean @default(false) @map("offer_recheck_after_new_prescription")
+  /// How long after first recording an outcome its doctor may still correct it.
+  outcomeEditWindowHours Int @default(72) @map("outcome_edit_window_hours")
 
   @@map("clinic_settings")
 }
@@ -62,8 +64,34 @@ model Resource {
   workingHours WorkingHours[]
   timeOff      TimeOff[]
   allocations  ResourceAllocation[]
+  /// The login account, for doctors.
+  staffUser    StaffUser?
 
   @@map("resources")
+}
+
+enum StaffRole {
+  DOCTOR
+  RECEPTION
+  ADMIN
+}
+
+/// A clinic staff login. Created by the seed or an admin, never by signing up.
+model StaffUser {
+  id          String     @id @default(uuid()) @db.Uuid
+  /// Trimmed and lower-case (CHECK constraint).
+  email       String     @unique
+  displayName String     @map("display_name")
+  role        StaffRole
+  /// Doctors only (CHECK constraint): which bookable resource this doctor is.
+  resourceId  String?    @unique @map("resource_id") @db.Uuid
+  resource    Resource?  @relation(fields: [resourceId], references: [id])
+  /// false = can't log in, and open sessions stop working.
+  active      Boolean    @default(true)
+  sessions    Session[]
+  outcomes    Outcome[]
+
+  @@map("staff_users")
 }
 
 /// A weekly working window in clinic-local time. Several windows per day allow breaks.
@@ -149,9 +177,16 @@ model Patient {
   @@map("patients")
 }
 
+/// Which door a login code opens. Kept apart so a patient code never logs anyone into staff.
+enum LoginPurpose {
+  PATIENT
+  STAFF
+}
+
 /// A one-time login code. Only a keyed hash is stored; rows are kept for rate limiting.
 model LoginCode {
-  id         String    @id @default(uuid()) @db.Uuid
+  id         String       @id @default(uuid()) @db.Uuid
+  purpose    LoginPurpose @default(PATIENT)
   email      String
   /// HMAC-SHA256(AUTH_SECRET, email:code). Useless without the secret.
   codeHash   String    @map("code_hash")
@@ -161,22 +196,29 @@ model LoginCode {
   expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
   consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
 
-  @@index([email, createdAt])
+  @@index([email, purpose, createdAt])
   @@index([requestIp, createdAt])
   @@map("login_codes")
 }
 
 /// A logged-in browser. The cookie holds a random token; only its SHA-256 hash is stored.
+/// Belongs to exactly one patient or one staff member (CHECK constraint).
 model Session {
-  id         String    @id @default(uuid()) @db.Uuid
-  tokenHash  String    @unique @map("token_hash")
-  patientId  String    @map("patient_id") @db.Uuid
-  patient    Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  createdAt  DateTime  @map("created_at") @db.Timestamptz(3)
-  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
-  revokedAt  DateTime? @map("revoked_at") @db.Timestamptz(3)
+  id                String     @id @default(uuid()) @db.Uuid
+  tokenHash         String     @unique @map("token_hash")
+  patientId         String?    @map("patient_id") @db.Uuid
+  patient           Patient?   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  staffUserId       String?    @map("staff_user_id") @db.Uuid
+  staffUser         StaffUser? @relation(fields: [staffUserId], references: [id], onDelete: Cascade)
+  createdAt         DateTime   @map("created_at") @db.Timestamptz(3)
+  expiresAt         DateTime   @map("expires_at") @db.Timestamptz(3)
+  revokedAt         DateTime?  @map("revoked_at") @db.Timestamptz(3)
+  /// When this session last passed the date-of-birth check (unlocks results briefly).
+  dobVerifiedAt     DateTime?  @map("dob_verified_at") @db.Timestamptz(3)
+  dobFailedAttempts Int        @default(0) @map("dob_failed_attempts")
 
   @@index([patientId])
+  @@index([staffUserId])
   @@map("sessions")
 }
 
@@ -219,9 +261,36 @@ model Appointment {
   createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   cancelledAt       DateTime?            @map("cancelled_at") @db.Timestamptz(3)
   allocations       ResourceAllocation[]
+  outcome           Outcome?
 
   @@index([patientId])
   @@map("appointments")
+}
+
+/// The four results a doctor can record. The agent may read only this and the note.
+enum OutcomeCode {
+  NO_CHANGE
+  NEW_PRESCRIPTION
+  FOLLOW_UP_6_MONTHS
+  REFERRAL_TO_SPECIALIST
+}
+
+/// What the doctor decided after an exam. There is deliberately no field for
+/// measurements anywhere in the schema: the agent can't see clinical data even by accident.
+model Outcome {
+  id                String      @id @default(uuid()) @db.Uuid
+  appointmentId     String      @unique @map("appointment_id") @db.Uuid
+  appointment       Appointment @relation(fields: [appointmentId], references: [id])
+  code              OutcomeCode
+  /// Written by the doctor for the patient, passed on word for word. 1-500 characters.
+  patientNote       String      @map("patient_note")
+  recordedByStaffId String      @map("recorded_by_staff_id") @db.Uuid
+  recordedBy        StaffUser   @relation(fields: [recordedByStaffId], references: [id])
+  recordedAt        DateTime    @map("recorded_at") @db.Timestamptz(3)
+  /// Set when the doctor corrects it; the patient sees an "edited" tag.
+  correctedAt       DateTime?   @map("corrected_at") @db.Timestamptz(3)
+
+  @@map("outcomes")
 }
 
 /// The time a booking claims on one resource. The exclusion constraint on this

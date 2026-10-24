@@ -88,6 +88,14 @@ export async function createTestApp(): Promise<TestApp> {
   };
 }
 
+/** Logs a staff member in through the staff door and returns a browser holding the staff cookie. */
+export async function staffLogin(t: TestApp, email: string) {
+  const browser = t.browser();
+  await browser.post('/staff/auth/request-code').send({ email }).expect(202);
+  await browser.post('/staff/auth/verify').send({ email, code: t.inbox.lastCode(email) }).expect(200);
+  return browser;
+}
+
 /** Logs in through the real email-code flow and returns a browser holding the session cookie. */
 export async function login(t: TestApp, email: string) {
   const browser = t.browser();

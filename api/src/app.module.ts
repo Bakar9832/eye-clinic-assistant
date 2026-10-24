@@ -17,6 +17,8 @@ import { MyAppointmentsController } from './me/my-appointments.controller.js';
 import { ConsoleEmailSender, EmailSender } from './notifications/email-sender.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { SchedulingErrorFilter } from './scheduling-error.filter.js';
+import { StaffAuthController } from './staff/staff-auth.controller.js';
+import { StaffGuard } from './staff/staff.guard.js';
 
 @Module({
   imports: [PrismaModule],
@@ -26,6 +28,7 @@ import { SchedulingErrorFilter } from './scheduling-error.filter.js';
     AuthController,
     MeController,
     MyAppointmentsController,
+    StaffAuthController,
   ],
   providers: [
     AvailabilityService,
@@ -33,6 +36,7 @@ import { SchedulingErrorFilter } from './scheduling-error.filter.js';
     AuditService,
     AuthService,
     SessionGuard,
+    StaffGuard,
     // Swapped for fakes in tests.
     { provide: Clock, useClass: SystemClock },
     { provide: EmailSender, useClass: ConsoleEmailSender },

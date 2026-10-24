@@ -3,13 +3,15 @@ import { createHash, createHmac, randomBytes, randomInt, timingSafeEqual } from 
 import { AuditService, SYSTEM, type Actor } from '../audit/audit.service.js';
 import { Clock } from '../clock.js';
 import { requireEnv } from '../config.js';
-import { PrismaClient } from '../generated/prisma/client.js';
+import { PrismaClient, type LoginPurpose } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
 import { EmailSender } from '../notifications/email-sender.js';
 
 export const CODE_TTL_MINUTES = 10;
 export const MAX_CODE_ATTEMPTS = 5;
 export const SESSION_DAYS = 7;
+/** Staff sessions last one shift. */
+export const STAFF_SESSION_HOURS = 12;
 export const CODES_PER_EMAIL = { limit: 5, windowMinutes: 15 };
 export const CODES_PER_IP = { limit: 10, windowMinutes: 60 };
 
@@ -23,11 +25,14 @@ export function normaliseEmail(email: string) {
 export interface NewSession {
   token: string;
   expiresAt: Date;
-  patientId: string;
 }
 
+type Owner = { patientId: string } | { staffUserId: string };
+
 /**
- * Passwordless login: email → 6-digit code → session cookie.
+ * Passwordless login: email → 6-digit code → session cookie. One flow, two doors:
+ * PATIENT (anyone; first login creates the patient) and STAFF (existing, active staff
+ * accounts only). Codes are tagged with their door, so a patient code never opens staff.
  *
  * Nothing secret is stored in readable form. Codes are stored as an HMAC keyed with
  * AUTH_SECRET (a plain hash of a 6-digit code is cracked in seconds); session tokens
@@ -45,14 +50,14 @@ export class AuthService {
   ) {}
 
   /** Same outcome whether or not the email has an account, so nobody can test which emails exist. */
-  async requestCode(rawEmail: string, ip: string | undefined) {
+  async requestCode(rawEmail: string, ip: string | undefined, purpose: LoginPurpose = 'PATIENT') {
     const email = normaliseEmail(rawEmail);
     const now = this.clock.now();
     const actor: Actor = { ...SYSTEM, ip };
 
     const [forEmail, forIp] = await Promise.all([
       this.prisma.loginCode.count({
-        where: { email, createdAt: { gt: new Date(now.getTime() - minutes(CODES_PER_EMAIL.windowMinutes)) } },
+        where: { email, purpose, createdAt: { gt: new Date(now.getTime() - minutes(CODES_PER_EMAIL.windowMinutes)) } },
       }),
       ip === undefined
         ? 0
@@ -65,15 +70,22 @@ export class AuthService {
       throw httpError(HttpStatus.TOO_MANY_REQUESTS, 'RATE_LIMITED', 'Too many code requests. Please wait and try again.');
     }
 
+    // Staff can't sign up: no account, no code, no email. The caller sees the same reply.
+    if (purpose === 'STAFF' && !(await this.activeStaff(email))) {
+      await this.audit.record({ actor, action: 'STAFF_CODE_REQUESTED_UNKNOWN' });
+      return;
+    }
+
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
 
     await this.prisma.$transaction(async (tx) => {
       // Only the newest code works: earlier unused ones are retired.
-      await tx.loginCode.updateMany({ where: { email, consumedAt: null }, data: { consumedAt: now } });
+      await tx.loginCode.updateMany({ where: { email, purpose, consumedAt: null }, data: { consumedAt: now } });
       await tx.loginCode.create({
         data: {
           email,
-          codeHash: this.hashCode(email, code),
+          purpose,
+          codeHash: this.hashCode(purpose, email, code),
           requestIp: ip,
           createdAt: now,
           expiresAt: new Date(now.getTime() + minutes(CODE_TTL_MINUTES)),
@@ -84,27 +96,32 @@ export class AuthService {
 
     await this.email.send({
       to: email,
-      subject: 'Your login code',
+      subject: purpose === 'STAFF' ? 'Your staff login code' : 'Your login code',
       text: `Your login code is ${code}. It expires in ${CODE_TTL_MINUTES} minutes.\nIf you didn't ask for it, ignore this email.`,
     });
   }
 
-  async verify(rawEmail: string, code: string, ip: string | undefined): Promise<NewSession> {
+  async verify(
+    rawEmail: string,
+    code: string,
+    ip: string | undefined,
+    purpose: LoginPurpose = 'PATIENT',
+  ): Promise<NewSession> {
     const email = normaliseEmail(rawEmail);
     const now = this.clock.now();
     const invalid = () => httpError(HttpStatus.UNAUTHORIZED, 'INVALID_CODE', 'That code is wrong or has expired.');
 
     const loginCode = await this.prisma.loginCode.findFirst({
-      where: { email, consumedAt: null, expiresAt: { gt: now } },
+      where: { email, purpose, consumedAt: null, expiresAt: { gt: now } },
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!loginCode || loginCode.attempts >= MAX_CODE_ATTEMPTS || !this.matches(loginCode.codeHash, email, code)) {
+    if (!loginCode || loginCode.attempts >= MAX_CODE_ATTEMPTS || !this.matches(loginCode.codeHash, purpose, email, code)) {
       if (loginCode) {
         // Counted in the database, so parallel guesses can't share one attempt.
         await this.prisma.loginCode.update({ where: { id: loginCode.id }, data: { attempts: { increment: 1 } } });
       }
-      await this.audit.record({ actor: { ...SYSTEM, ip }, action: 'LOGIN_FAILED' });
+      await this.audit.record({ actor: { ...SYSTEM, ip }, action: 'LOGIN_FAILED', details: { purpose } });
       throw invalid();
     }
 
@@ -115,9 +132,16 @@ export class AuthService {
     });
     if (count === 0) throw invalid();
 
-    // First login creates the patient. Name and date of birth come later, before booking.
+    if (purpose === 'STAFF') {
+      // Re-checked: the account may have been switched off since the code was sent.
+      const staff = await this.activeStaff(email);
+      if (!staff) throw invalid();
+      return this.startSession({ staffUserId: staff.id }, 'STAFF_LOGIN_SUCCEEDED', ip, minutes(STAFF_SESSION_HOURS * 60));
+    }
+
+    // First patient login creates the patient. Name and date of birth come later, before booking.
     const patient = await this.prisma.patient.upsert({ where: { email }, create: { email }, update: {} });
-    return this.startSession(patient.id, 'LOGIN_SUCCEEDED', ip);
+    return this.startSession({ patientId: patient.id }, 'LOGIN_SUCCEEDED', ip, minutes(SESSION_DAYS * 24 * 60));
   }
 
   /** "Try as demo patient". Only when DEMO_MODE=true; read on every call so it can be switched off. */
@@ -125,45 +149,62 @@ export class AuthService {
     const demo =
       process.env.DEMO_MODE === 'true' ? await this.prisma.patient.findFirst({ where: { isDemo: true } }) : null;
     if (!demo) throw httpError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Not found.');
-    return this.startSession(demo.id, 'DEMO_LOGIN', ip);
+    return this.startSession({ patientId: demo.id }, 'DEMO_LOGIN', ip, minutes(SESSION_DAYS * 24 * 60));
   }
 
-  /** The patient behind a session cookie, or null if it's missing, revoked or expired. */
+  /** The session behind a cookie, or null if it's missing, revoked or expired. */
   async findSession(token: string | undefined) {
     if (!token) return null;
     return this.prisma.session.findFirst({
       where: { tokenHash: hashToken(token), revokedAt: null, expiresAt: { gt: this.clock.now() } },
-      select: { id: true, patientId: true },
+      include: { staffUser: { select: { id: true, role: true, resourceId: true, active: true } } },
     });
   }
 
   async logout(token: string | undefined, ip: string | undefined) {
     const session = await this.findSession(token);
     if (!session) return;
-    await this.prisma.session.update({ where: { id: session.id }, data: { revokedAt: this.clock.now() } });
-    await this.audit.record({ actor: { type: 'PATIENT', id: session.patientId, ip }, action: 'LOGOUT' });
+    await this.revoke(session.id);
+    await this.audit.record({ actor: actorFor(session, ip), action: 'LOGOUT' });
   }
 
-  private async startSession(patientId: string, action: string, ip: string | undefined): Promise<NewSession> {
+  async revoke(sessionId: string) {
+    await this.prisma.session.update({ where: { id: sessionId }, data: { revokedAt: this.clock.now() } });
+  }
+
+  private activeStaff(email: string) {
+    return this.prisma.staffUser.findFirst({ where: { email, active: true } });
+  }
+
+  private async startSession(owner: Owner, action: string, ip: string | undefined, lengthMs: number): Promise<NewSession> {
     const now = this.clock.now();
     const token = randomBytes(32).toString('base64url');
-    const expiresAt = new Date(now.getTime() + SESSION_DAYS * 24 * 60 * 60_000);
+    const expiresAt = new Date(now.getTime() + lengthMs);
 
-    await this.prisma.session.create({ data: { tokenHash: hashToken(token), patientId, createdAt: now, expiresAt } });
-    await this.audit.record({ actor: { type: 'PATIENT', id: patientId, ip }, action });
-    return { token, expiresAt, patientId };
+    await this.prisma.session.create({ data: { tokenHash: hashToken(token), ...owner, createdAt: now, expiresAt } });
+    await this.audit.record({
+      actor: 'staffUserId' in owner ? { type: 'STAFF', id: owner.staffUserId, ip } : { type: 'PATIENT', id: owner.patientId, ip },
+      action,
+    });
+    return { token, expiresAt };
   }
 
-  private hashCode(email: string, code: string) {
-    return createHmac('sha256', this.secret).update(`${email}:${code}`).digest('hex');
+  private hashCode(purpose: LoginPurpose, email: string, code: string) {
+    return createHmac('sha256', this.secret).update(`${purpose}:${email}:${code}`).digest('hex');
   }
 
   /** Constant-time comparison, so response timing doesn't leak how close a guess was. */
-  private matches(storedHash: string, email: string, code: string) {
-    return timingSafeEqual(Buffer.from(storedHash, 'hex'), Buffer.from(this.hashCode(email, code), 'hex'));
+  private matches(storedHash: string, purpose: LoginPurpose, email: string, code: string) {
+    return timingSafeEqual(Buffer.from(storedHash, 'hex'), Buffer.from(this.hashCode(purpose, email, code), 'hex'));
   }
 }
 
 export function hashToken(token: string) {
   return createHash('sha256').update(token).digest('hex');
+}
+
+function actorFor(session: { patientId: string | null; staffUserId: string | null }, ip: string | undefined): Actor {
+  return session.staffUserId
+    ? { type: 'STAFF', id: session.staffUserId, ip }
+    : { type: 'PATIENT', id: session.patientId ?? undefined, ip };
 }

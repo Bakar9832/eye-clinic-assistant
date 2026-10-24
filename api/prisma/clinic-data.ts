@@ -21,10 +21,12 @@ export const BILAL_DAYS = [1, 3, 4];
  * The audit log is append-only and is never wiped.
  */
 export async function seedClinic(prisma: PrismaClient, timezone: string) {
-  // Children first, so foreign keys don't block the wipe. Sessions go with their patients.
+  // Children first, so foreign keys don't block the wipe. Sessions go with their owners.
   await prisma.loginCode.deleteMany();
+  await prisma.outcome.deleteMany();
   await prisma.resourceAllocation.deleteMany();
   await prisma.appointment.deleteMany();
+  await prisma.staffUser.deleteMany();
   await prisma.patient.deleteMany();
   await prisma.appointmentType.deleteMany();
   await prisma.resource.deleteMany();
@@ -195,9 +197,23 @@ export async function seedClinic(prisma: PrismaClient, timezone: string) {
     data: { fullName: 'Test Child Three', email: 'test.three@example.com', dateOfBirth: new Date('2016-09-20') },
   });
 
+  // --- Staff logins ---------------------------------------------------------
+  // .example is reserved for documentation, so these can never be real inboxes either.
+  const staffData = [
+    { key: 'drAyesha', email: 'dr.ayesha@clinic.example', displayName: 'Dr Ayesha', role: 'DOCTOR', resourceId: ayesha.id },
+    { key: 'drBilal', email: 'dr.bilal@clinic.example', displayName: 'Dr Bilal', role: 'DOCTOR', resourceId: bilal.id },
+    { key: 'reception', email: 'reception@clinic.example', displayName: 'Reception', role: 'RECEPTION' },
+    { key: 'admin', email: 'admin@clinic.example', displayName: 'Clinic Admin', role: 'ADMIN' },
+  ] as const;
+  const staff = {} as Record<(typeof staffData)[number]['key'], { id: string; email: string }>;
+  for (const { key, ...data } of staffData) {
+    staff[key] = await prisma.staffUser.create({ data });
+  }
+
   return {
     resources: { ayesha, bilal, sara, usman, scanner },
     types,
     patients: { demo, two, three },
+    staff,
   };
 }

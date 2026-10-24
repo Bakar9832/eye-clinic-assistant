@@ -35,7 +35,7 @@ const at = (day: DateTime, time: string) => {
 const plusMin = (date: Date, minutes: number) => new Date(date.getTime() + minutes * 60_000);
 
 async function main() {
-  const { resources, types, patients } = await seedClinic(prisma, clinicTimezone);
+  const { resources, types, patients, staff } = await seedClinic(prisma, clinicTimezone);
   const { ayesha, bilal, sara, scanner } = resources;
 
   // Dr Bilal is on leave for one full working day next week.
@@ -86,6 +86,38 @@ async function main() {
       cancelledAt: new Date(),
       allocations: {
         create: [{ resourceId: bilal.id, startsAt: lensStart, endsAt: plusMin(lensStart, 45), active: false }],
+      },
+    },
+  });
+
+  // Past visit with a result already recorded, so the demo can show results straight away.
+  // Last week's weekday, 11:00: pre-test with Sara, exam with Dr Ayesha.
+  let lastWeek = DateTime.now().setZone(clinicTimezone).startOf('day').minus({ days: 7 });
+  while (!MON_FRI.includes(lastWeek.weekday)) lastWeek = lastWeek.minus({ days: 1 });
+  const pastStart = at(lastWeek, '11:00');
+  await prisma.appointment.create({
+    data: {
+      reference: generateReference(),
+      patientId: patients.demo.id,
+      appointmentTypeId: types.ROUTINE_EYE_TEST.id,
+      startsAt: pastStart,
+      endsAt: plusMin(pastStart, 30),
+      status: 'COMPLETED',
+      allocations: {
+        create: [
+          { resourceId: sara.id, startsAt: pastStart, endsAt: plusMin(pastStart, 10) },
+          { resourceId: ayesha.id, startsAt: plusMin(pastStart, 10), endsAt: plusMin(pastStart, 30) },
+        ],
+      },
+      outcome: {
+        create: {
+          code: 'NEW_PRESCRIPTION',
+          patientNote:
+            'Your eyesight has changed a little since your last test. New glasses will make reading easier. ' +
+            'Please come back for a check in 12 months, or sooner if anything changes.',
+          recordedByStaffId: staff.drAyesha.id,
+          recordedAt: plusMin(pastStart, 35),
+        },
       },
     },
   });
