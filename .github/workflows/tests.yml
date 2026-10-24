@@ -1,0 +1,85 @@
+# Every push and pull request: all tests, no model calls (fast and free).
+# The secrets below are throwaway values for the test run only.
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  api:
+    name: API (NestJS + PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: eyeClinicAssistant
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/eyeClinicAssistant?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/eyeClinicAssistant_test?schema=public
+      AUTH_SECRET: ci-only-auth-secret
+      AGENT_TOKEN_SECRET: ci-only-agent-token-secret
+      AGENT_URL: http://localhost:8001
+      AGENT_SERVICE_KEY: ci-only-agent-service-key
+      DEMO_MODE: 'true'
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - name: Create the test database (the tests apply migrations themselves)
+        run: PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE "eyeClinicAssistant_test"'
+      - run: npx tsc --noEmit -p tsconfig.json
+      - run: npx oxlint src test prisma
+      - name: Unit and database tests
+        run: npx vitest run
+      - name: HTTP tests
+        run: npm run test:e2e
+
+  agent:
+    name: Agent (Python)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.14'
+          cache: pip
+          cache-dependency-path: agent/pyproject.toml
+      - run: pip install -e ".[dev]"
+      - run: pytest -q
+
+  web:
+    name: Web (React)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - run: npx vite build
