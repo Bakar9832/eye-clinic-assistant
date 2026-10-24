@@ -187,6 +187,12 @@ describe('profile', () => {
     expect(res.body).toMatchObject({ fullName: 'New Person', hasDateOfBirth: true, profileComplete: true });
     expect(res.body).not.toHaveProperty('dateOfBirth');
     expect(JSON.stringify(res.body)).not.toContain('1992');
+
+    // The audit names exactly the fields that were sent, never their values.
+    // (The audit log is never wiped, so look for this patient's event only.)
+    const { id } = await t.prisma.patient.findUniqueOrThrow({ where: { email: NEW_PERSON } });
+    const event = await t.prisma.auditEvent.findFirstOrThrow({ where: { action: 'PROFILE_UPDATED', actorId: id } });
+    expect(event.details).toEqual({ fields: ['fullName', 'dateOfBirth'] });
   });
 
   it('the date of birth can be set once; a stolen session cannot change it', async () => {

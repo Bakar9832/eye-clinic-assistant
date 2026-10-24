@@ -11,6 +11,16 @@ export interface Actor {
 
 export const SYSTEM: Actor = { type: 'SYSTEM' };
 
+/**
+ * The names of the fields a request actually set. Not Object.keys(body): validated DTO
+ * classes carry every declared field, unset ones as undefined.
+ */
+export function changedFields(body: object): string[] {
+  return Object.entries(body)
+    .filter(([, value]) => value !== undefined)
+    .map(([key]) => key);
+}
+
 export interface AuditInput {
   actor: Actor;
   action: string;

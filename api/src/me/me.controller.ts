@@ -9,7 +9,7 @@ import {
   type ValidatorConstraintInterface,
 } from 'class-validator';
 import { IANAZone } from 'luxon';
-import { AuditService } from '../audit/audit.service.js';
+import { AuditService, changedFields } from '../audit/audit.service.js';
 import { CurrentPatient, SessionGuard, type PatientActor } from '../auth/session.guard.js';
 import { Clock } from '../clock.js';
 import { PrismaClient } from '../generated/prisma/client.js';
@@ -85,7 +85,7 @@ export class MeController {
       action: 'PROFILE_UPDATED',
       entityType: 'Patient',
       entityId: me.id,
-      details: { fields: Object.keys(body) },
+      details: { fields: changedFields(body) },
     });
     return toProfile(updated);
   }

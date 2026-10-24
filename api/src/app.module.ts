@@ -1,6 +1,8 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_PIPE } from '@nestjs/core';
 import cookieParser from 'cookie-parser';
+import { AdminController } from './admin/admin.controller.js';
+import { AdminService } from './admin/admin.service.js';
 import { AppointmentTypesController } from './appointment-types/appointment-types.controller.js';
 import { AuditService } from './audit/audit.service.js';
 import { AuthController } from './auth/auth.controller.js';
@@ -36,11 +38,13 @@ import { StaffGuard } from './staff/staff.guard.js';
     StaffAuthController,
     StaffClinicController,
     StaffBookingsController,
+    AdminController,
   ],
   providers: [
     AvailabilityService,
     BookingService,
     OutcomesService,
+    AdminService,
     AuditService,
     AuthService,
     SessionGuard,
