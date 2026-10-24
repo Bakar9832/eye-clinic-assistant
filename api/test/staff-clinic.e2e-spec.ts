@@ -193,6 +193,20 @@ describe('correcting an outcome', () => {
     expect(await t.prisma.auditEvent.count({ where: { entityId: id, action: 'OUTCOME_CORRECTED' } })).toBe(1);
   });
 
+  it('R5. reception cannot correct an outcome either, and the note stays as the doctor wrote it', async () => {
+    const { id } = await recorded();
+    const reception = await staffLogin(t, 'reception@clinic.example');
+
+    const res = await reception
+      .put(`/staff/appointments/${id}/outcome`)
+      .send(outcome('NEW_PRESCRIPTION', 'Changed by the front desk.'))
+      .expect(403);
+    expect(res.body.error).toBe('FORBIDDEN');
+
+    const saved = await t.prisma.outcome.findUniqueOrThrow({ where: { appointmentId: id } });
+    expect(saved).toMatchObject({ code: 'NO_CHANGE', patientNote: NOTE, correctedAt: null });
+  });
+
   it('O6b. another doctor cannot correct it', async () => {
     const { id } = await recorded();
     // Dr Bilal didn't do the exam, so he's refused before he even gets to the outcome.
