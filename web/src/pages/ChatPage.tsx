@@ -74,11 +74,11 @@ export function ChatPage() {
     <div className="flex h-[calc(100vh-12rem)] min-h-96 flex-col">
       {me === null && (
         <p className="mb-3 rounded bg-brand-50 px-3 py-2 text-sm text-brand-800">
-          You can ask about free times without logging in. To book or see results,{' '}
+          <strong>Chatting as a guest:</strong> ask about appointments and when doctors are free.{' '}
           <Link to="/login" className="font-medium underline">
-            log in
-          </Link>
-          .
+            Log in
+          </Link>{' '}
+          to book or see your results.
         </p>
       )}
 

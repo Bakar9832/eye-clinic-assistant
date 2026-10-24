@@ -83,9 +83,10 @@ describe('the chat', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('wait a few minutes');
   });
 
-  it('logged out: invites the visitor to log in for bookings and results', async () => {
+  it('logged out: says the visitor is a guest and invites them to log in for bookings and results', async () => {
     mockApi({});
     renderApp('/');
-    await waitFor(() => expect(screen.getByText(/To book or see results/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Chatting as a guest:')).toBeInTheDocument());
+    expect(screen.getByRole('link', { name: 'Log in' }).closest('p')).toHaveTextContent('to book or see your results.');
   });
 });
