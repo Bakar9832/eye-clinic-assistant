@@ -10,7 +10,7 @@ setup:
     - { label: scan, patient: two, type: SCAN_ONLY, date: 2030-01-14, time: "10:00" }
 turns:
   - Book a routine eye test with Dr Ayesha on Monday 14 January at 10am.
-  - OK, then the closest time to that, please.
+  - OK, book whichever free time is closest to 10, please. Either one is fine.
 expect:
   newBookings: 1
   booked:

@@ -114,13 +114,18 @@ async function main() {
   );
   const model = requireEnv('LLM_MODEL');
   const pace = pacer(Number(process.env.EVAL_MAX_LLM_CALLS_PER_MINUTE ?? 12));
+
+  // The grader can be a different provider from the agent, so a local model is never
+  // marking its own answers when models are compared. Defaults to the agent's settings.
+  const separateGrader = Boolean(process.env.EVAL_GRADER_BASE_URL);
+  const graderModel = process.env.EVAL_GRADER_MODEL || model;
   const grade = createGrader({
-    baseUrl: requireEnv('LLM_BASE_URL'),
-    apiKey: requireEnv('LLM_API_KEY'),
-    models: [process.env.EVAL_GRADER_MODEL || model, process.env.LLM_FALLBACK_MODEL].filter(Boolean) as string[],
+    baseUrl: process.env.EVAL_GRADER_BASE_URL || requireEnv('LLM_BASE_URL'),
+    apiKey: process.env.EVAL_GRADER_API_KEY || requireEnv('LLM_API_KEY'),
+    models: [graderModel, ...(separateGrader ? [] : [process.env.LLM_FALLBACK_MODEL])].filter(Boolean) as string[],
   });
 
-  const results: EvalResults = { variant, model, repeats, startedAt: new Date().toISOString(), cases: [] };
+  const results: EvalResults = { variant, model, graderModel, repeats, startedAt: new Date().toISOString(), cases: [] };
   let stoppedEarly: string | null = null;
   try {
     await waitFor(`${process.env.AGENT_URL}/health`, agent);
@@ -151,28 +156,33 @@ async function main() {
 
   const outDir = path.join(HERE, 'results');
   fs.mkdirSync(outDir, { recursive: true });
+  // One file per prompt and model, e.g. full-gemini-3.5-flash-lite.json, so runs on
+  // different models never overwrite each other.
+  const slug = model.toLowerCase().replace(/[^a-z0-9.]+/g, '-').replace(/^-|-$/g, '');
+  const name = `${variant}-${slug}`;
 
   if (stoppedEarly) {
     // Never let an outage pass as agent failures, or overwrite a complete earlier result.
-    fs.writeFileSync(path.join(outDir, `${variant}.incomplete.json`), JSON.stringify({ ...results, stoppedEarly }, null, 2));
+    fs.writeFileSync(path.join(outDir, `${name}.incomplete.json`), JSON.stringify({ ...results, stoppedEarly }, null, 2));
     console.error(
       `\nStopped after ${results.cases.length} of ${cases.length} case(s): ${stoppedEarly}\n` +
-        `Nothing was scored as a failure because of it. Partial results: evals/results/${variant}.incomplete.json.\n` +
+        `Nothing was scored as a failure because of it. Partial results: evals/results/${name}.incomplete.json.\n` +
         `Try again once the quota resets, or switch LLM_* in .env to another model.`,
     );
     process.exitCode = 2;
     return;
   }
 
-  fs.writeFileSync(path.join(outDir, `${variant}.json`), JSON.stringify(results, null, 2));
+  fs.writeFileSync(path.join(outDir, `${name}.json`), JSON.stringify(results, null, 2));
   const report = markdownReport(results);
-  fs.writeFileSync(path.join(outDir, `${variant}.md`), report);
+  fs.writeFileSync(path.join(outDir, `${name}.md`), report);
 
-  const other = path.join(outDir, `${variant === 'full' ? 'minimal' : 'full'}.json`);
+  // Full prompt vs baseline, once both exist for the same model.
+  const other = path.join(outDir, `${variant === 'full' ? 'minimal' : 'full'}-${slug}.json`);
   if (fs.existsSync(other)) {
     const otherResults = JSON.parse(fs.readFileSync(other, 'utf8')) as EvalResults;
     const [full, minimal] = variant === 'full' ? [results, otherResults] : [otherResults, results];
-    fs.writeFileSync(path.join(outDir, 'comparison.md'), comparisonTable(full, minimal) + '\n');
+    fs.writeFileSync(path.join(outDir, `comparison-${slug}.md`), comparisonTable(full, minimal) + '\n');
   }
 
   const overall = passRate(results);

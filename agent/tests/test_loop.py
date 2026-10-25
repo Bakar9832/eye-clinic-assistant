@@ -153,3 +153,13 @@ async def test_the_minimal_baseline_prompt_has_the_date_but_none_of_the_rules():
     prompt = fake.calls[0]["messages"][0]["content"]
     assert "Tuesday 2030-01-01" in prompt
     assert "medical advice" not in prompt and "HARD RULES" not in prompt
+
+
+async def test_the_prompt_says_to_confirm_alternatives_and_hand_off_once():
+    fake = FakeOpenAI([answer("Hi")])
+    await run_turn(turn_request(), llm_for(fake), FakeTools())
+
+    prompt = fake.calls[0]["messages"][0]["content"]
+    assert "offer up to three times that are actually free" in prompt
+    assert "book or move only to a time the patient has confirmed" in prompt
+    assert "Hand each question to staff once" in prompt

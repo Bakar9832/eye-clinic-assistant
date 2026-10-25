@@ -16,6 +16,8 @@ export interface CaseResult {
 export interface EvalResults {
   variant: 'full' | 'minimal';
   model: string;
+  /** Which model judged the wording checks. */
+  graderModel?: string;
   repeats: number;
   startedAt: string;
   cases: CaseResult[];
@@ -59,7 +61,8 @@ export function markdownReport(results: EvalResults): string {
   const lines = [
     `# Eval results: ${results.variant} prompt, ${results.model}`,
     '',
-    `${results.startedAt} · ${results.cases.length} cases × ${results.repeats} run(s) · a case passes on a majority of its runs`,
+    `${results.startedAt} · ${results.cases.length} cases × ${results.repeats} run(s) · a case passes on a majority of its runs` +
+      (results.graderModel ? ` · wording graded by ${results.graderModel}` : ''),
     '',
     '| Category | Passed | Pass rate |',
     '|---|---|---|',
