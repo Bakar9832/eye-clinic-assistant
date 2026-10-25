@@ -1,6 +1,12 @@
 # Graded conversations against the real agent and a real model. Uses model quota, so it
 # runs nightly and on demand, not on every push. Fails when the pass rate is below 80%.
 #
+# PARKED: the agent now runs on a local model (Ollama on the owner's PC), which GitHub's
+# servers can't reach. A hosted free tier was tried first, but one full eval run used up
+# most of the daily request limit and runs stopped part-way when it ran out. The evals are
+# run locally (cd api; npm run eval) and the results committed under evals/results/history.
+# This job stays skipped until a model reachable from GitHub is configured:
+#
 # Needs, in the repository's Settings → Secrets and variables → Actions:
 #   secret   LLM_API_KEY
 #   variable LLM_BASE_URL, LLM_MODEL, and optionally LLM_FALLBACK_MODEL
