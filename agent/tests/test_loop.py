@@ -4,6 +4,7 @@ import json
 
 from eye_agent.llm import LLM
 from eye_agent.loop import MAX_TOOL_CALLS, TOO_MANY_STEPS, run_turn
+from eye_agent.prompt import upcoming_days
 from eye_agent.tools import ToolOutcome
 
 from .fakes import FakeOpenAI, FakeTools, answer, no_wait, tool_call, turn_request
@@ -166,9 +167,30 @@ async def test_the_prompt_separates_book_now_ask_first_and_offer_alternatives():
     # Qwen 3.5 9B always stopped to ask after check_availability, so an instruction goes
     # straight to book, which checks the time itself.
     assert "Call book straight away, without check_availability" in prompt
-    assert "If it's free, say so and ask if you should book it" in prompt
+    assert "If requested_time_free is true, say so and ask if you should book it" in prompt
     assert "offer up to four free times, the closest to what they asked for" in prompt
     assert "call book right away without asking again" in prompt
     assert "cancel it straight away. Ask only if two or more appointments could match" in prompt
+    assert "check_availability with near set to that time" in prompt
+    assert "Never use book to move" in prompt
     assert "Never book or move to a time the patient hasn't asked for or agreed to" in prompt
     assert "Hand each question to staff once" in prompt
+
+
+def test_the_next_days_are_listed_so_the_model_never_counts_dates():
+    # 2030-01-01 is a Tuesday: the list starts the next day and runs two weeks.
+    days = upcoming_days("2030-01-01").split(", ")
+
+    assert len(days) == 14
+    assert days[0] == "Wed 2030-01-02"
+    assert days[2] == "Fri 2030-01-04"
+    assert days[-1] == "Tue 2030-01-15"
+
+
+async def test_the_full_prompt_carries_the_day_list_and_the_baseline_does_not():
+    fake = FakeOpenAI([answer("Hi"), answer("Hi")])
+    await run_turn(turn_request(), llm_for(fake), FakeTools())
+    await run_turn(turn_request(), llm_for(fake), FakeTools(), prompt="minimal")
+
+    assert "Fri 2030-01-04" in fake.calls[0]["messages"][0]["content"]
+    assert "Fri 2030-01-04" not in fake.calls[1]["messages"][0]["content"]

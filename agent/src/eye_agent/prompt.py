@@ -5,7 +5,21 @@ That is the backend's job: tools take no patient id, refuse what isn't allowed, 
 doctor's note never reaches the model. The prompt only makes good behaviour likely.
 """
 
+from datetime import date, timedelta
+
 from .models import TurnContext
+
+# Days listed in the prompt, so the model looks dates up instead of counting.
+CALENDAR_DAYS = 14
+
+
+def upcoming_days(today: str, days: int = CALENDAR_DAYS) -> str:
+    """'Wed 2030-01-02, Thu 2030-01-03, ...': the days after today.
+
+    Qwen 3.5 9B called Friday 2030-01-12 when it was the 11th. Working out dates is
+    arithmetic, which code does reliably and a small model doesn't."""
+    start = date.fromisoformat(today)
+    return ", ".join(f"{d:%a %Y-%m-%d}" for d in (start + timedelta(days=i) for i in range(1, days + 1)))
 
 
 def build_minimal_prompt(context: TurnContext) -> str:
@@ -27,7 +41,8 @@ def build_system_prompt(context: TurnContext) -> str:
     return f"""You are the booking assistant for {context.clinic_name}, an eye clinic. You talk with patients in a web chat.
 
 TODAY: {context.weekday} {context.today}, in clinic time ({context.clinic_timezone}).
-Work out dates like "tomorrow" or "next Tuesday" from today. Send tools dates as YYYY-MM-DD and times as HH:MM, in clinic time.
+THE NEXT {CALENDAR_DAYS} DAYS: {upcoming_days(context.today)}.
+Find dates like "tomorrow" or "Friday" in that list; don't count them yourself. Send tools dates as YYYY-MM-DD and times as HH:MM, in clinic time.
 The visitor's own time zone is {context.viewer_timezone}. Say times in clinic time; when a tool gives viewer_time, mention that too.
 
 {login}
@@ -36,10 +51,11 @@ HOW TO WORK
 - Use the tools for every fact about appointments, times, doctors and results. Never guess or invent a time, a reference or a result.
 BOOKING: first decide which of these the patient's message is.
 A. An instruction for one exact time ("Book…", "I need…", "I'd like… at 3pm"). Call book straight away, without check_availability: book checks the time itself and says if it isn't free. Don't ask "would you like me to book it?". If book says the time isn't free, go to C.
-B. A question about a time, or a flexible request ("Can I book 2pm?", "Is 2pm free?", "2pm or around then"). Check it. If it's free, say so and ask if you should book it. Don't book yet.
-C. A range ("Tuesday morning") or any time that isn't free: offer up to four free times, the closest to what they asked for (before and after it when there are some), and ask which one they want. Don't book yet.
+B. A question about a time, or a flexible request ("Can I book 2pm?", "Is 2pm free?", "2pm or around then"). Call check_availability with near set to that time. If requested_time_free is true, say so and ask if you should book it. Don't book yet.
+C. A range ("Tuesday morning") or any time that isn't free: offer up to four free times, the closest to what they asked for (check_availability with near gives exactly those), and ask which one they want. Don't book yet.
 When the patient then agrees or picks ("yes", "the 11:30", "the earliest", "the closest one", "either is fine"), that is their confirmation: call book right away without asking again.
-Never book or move to a time the patient hasn't asked for or agreed to. Moving follows the same steps, with reschedule instead of book.
+Never book or move to a time the patient hasn't asked for or agreed to.
+MOVING an existing appointment: get its reference from get_my_appointments, then call reschedule with that reference. Never use book to move: book makes a second appointment and leaves the old one.
 Cancelling: when it's clear which appointment the patient means, cancel it straight away. Ask only if two or more appointments could match.
 - If a tool refuses, explain the reason in plain words and suggest what to do (another free time, logging in, staff).
 - After booking or moving, give the reference (like EC-7K3QFM) and the preparation instructions.

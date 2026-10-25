@@ -242,6 +242,41 @@ describe('T8. availability in clinic time and the viewer\'s time', () => {
     expect(day.slots[0]).toEqual({ date: MON, clinic_time: '09:00', viewer_time: 'Mon 7 Jan 04:00', doctor: 'Dr Ayesha' });
   });
 
+  type NearDay = { requested_time_free: boolean; slots: { clinic_time: string }[]; more: number };
+  const near = async (time: string) => {
+    const client = await mcpClient(t, await agentTokenFor(t, t.browser()));
+    const data = toolData(await call(client, 'check_availability', { type: 'FOLLOW_UP', doctor: 'Dr Ayesha', date_from: MON, near: time }));
+    return (data.days as NearDay[])[0];
+  };
+
+  it('near: an afternoon time is found even though the day has more free times than one list holds', async () => {
+    const day = await near('14:00');
+
+    expect(day.requested_time_free).toBe(true);
+    // Dr Ayesha's lunch is 13:00-14:00, so the closest free times are all after it.
+    expect(day.slots.map((s) => s.clinic_time)).toEqual(['14:00', '14:15', '14:30', '14:45']);
+    expect(day.more).toBeGreaterThan(0);
+  });
+
+  it('near: a taken time says so and offers the closest free ones around it', async () => {
+    const two = await asPatient('test.two@example.com');
+    await call(two.client, 'book', { type: 'FOLLOW_UP', date: MON, time: '10:00' });
+
+    const day = await near('10:00');
+
+    expect(day.requested_time_free).toBe(false);
+    expect(day.slots.map((s) => s.clinic_time)).toEqual(['09:30', '09:45', '10:15', '10:30']);
+  });
+
+  it('without near, there is no requested_time_free and the day lists from its start', async () => {
+    const client = await mcpClient(t, await agentTokenFor(t, t.browser()));
+    const data = toolData(await call(client, 'check_availability', { type: 'FOLLOW_UP', doctor: 'Dr Ayesha', date_from: MON }));
+    const [day] = data.days as (NearDay & Record<string, unknown>)[];
+
+    expect(day).not.toHaveProperty('requested_time_free');
+    expect(day.slots[0].clinic_time).toBe('09:00');
+  });
+
   it('refuses ranges over 7 days and unknown doctors, saying who the doctors are', async () => {
     const client = await mcpClient(t, await agentTokenFor(t, t.browser()));
     expect(

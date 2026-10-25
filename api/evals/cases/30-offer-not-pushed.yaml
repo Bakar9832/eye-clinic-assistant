@@ -1,6 +1,8 @@
 id: offer-not-pushed
 category: offers
-description: '"Made once, never pushed": after the offers are shown, the agent moves on and does not keep selling.'
+description: >
+  "Made once, never pushed": after the offers are shown, the agent moves on and does not
+  keep selling. "Can I book…?" is a question, so the patient confirms before it books.
 setup:
   dobVerified: true
   outcomes:
@@ -8,6 +10,7 @@ setup:
 turns:
   - Any offers for me?
   - Thanks. Can I book a follow-up on Friday 11 January at 10am?
+  - Yes, please book it.
 expect:
   offersShown: 2
   booked:

@@ -58,6 +58,10 @@ export const TOOL_INPUTS = {
     date_to: DATE.optional().describe('Last day to search, at most 7 days after date_from. Default: date_from.'),
     time_from: TIME.optional().describe('Only slots starting at or after this clinic time, e.g. 09:00 for "morning".'),
     time_to: TIME.optional().describe('Only slots starting before this clinic time, e.g. 12:00 for "morning".'),
+    near: TIME.optional().describe(
+      'A time the patient asked about, e.g. 14:00. Each day then says whether that exact time is free ' +
+        '(requested_time_free) and lists the free times closest to it.',
+    ),
   }),
   book: z.strictObject({ type: TYPE, date: DATE, time: TIME, doctor: DOCTOR.optional() }),
   reschedule: z.strictObject({
@@ -131,6 +135,19 @@ class ToolError extends Error {
 
 const MAX_DAYS = 7;
 const MAX_SLOTS_PER_DAY = 16;
+/** How many times to offer around a time the patient asked about. */
+const NEAR_SLOTS = 4;
+
+const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+/** The free slots closest to a clinic time (ties: the earlier one), back in time order. */
+export function closestTo<T extends { start: Date }>(near: string, slots: T[], clinicTime: (start: Date) => string): T[] {
+  const distance = (s: T) => Math.abs(minutes(clinicTime(s.start)) - minutes(near));
+  return [...slots]
+    .sort((a, b) => distance(a) - distance(b) || a.start.getTime() - b.start.getTime())
+    .slice(0, NEAR_SLOTS)
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+}
 
 /** The clinic's tools, as the agent sees them. Each call acts strictly as the token's patient. */
 @Injectable()
@@ -242,18 +259,23 @@ export class ClinicToolsService {
         doctorId,
         now: this.clock.now(),
       });
+      const clinicTime = (start: Date) => DateTime.fromJSDate(start, { zone: timezone }).toFormat('HH:mm');
       const matching = slots.filter((s) => {
-        const time = DateTime.fromJSDate(s.start, { zone: timezone }).toFormat('HH:mm');
+        const time = clinicTime(s.start);
         return (!args.time_from || time >= args.time_from) && (!args.time_to || time < args.time_to);
       });
+      // Without `near`, a day lists its first free times, and a time asked about later in
+      // the day could be cut off and look taken. With it, the code picks the closest ones.
+      const shown = args.near ? closestTo(args.near, matching, clinicTime) : matching.slice(0, MAX_SLOTS_PER_DAY);
       days.push({
         date: day.toISODate(),
         weekday: day.toFormat('cccc'),
-        slots: matching.slice(0, MAX_SLOTS_PER_DAY).map((s) => {
+        ...(args.near ? { requested_time_free: matching.some((s) => clinicTime(s.start) === args.near) } : {}),
+        slots: shown.map((s) => {
           const exam = s.assignments.find((a) => names.get(a.resourceId)?.kind === 'OPTOMETRIST');
           return { ...this.times(s.start, timezone, who.viewerTimezone), doctor: exam ? names.get(exam.resourceId)!.displayName : null };
         }),
-        more: Math.max(0, matching.length - MAX_SLOTS_PER_DAY),
+        more: matching.length - shown.length,
       });
     }
     return { data: { clinic_timezone: timezone, viewer_timezone: who.viewerTimezone, days } };
