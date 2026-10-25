@@ -67,6 +67,17 @@ describe('a chat turn', () => {
     expect((await browser.get(`/chat/${res.body.conversationId}`)).body[1].cards).toEqual([card]);
   });
 
+  it("the patient's own date of birth never comes back in a reply, even if the model repeats it", async () => {
+    // The seeded demo patient was born on 1990-01-15.
+    t.agent.respond = async () => ({ reply: 'Please confirm 1990-01-15 in the secure box on the page.', cards: [] });
+    const browser = await login(t, DEMO);
+
+    const res = await browser.post('/chat').send({ message: 'My date of birth is 1990-01-15, show my results.' }).expect(200);
+    expect(res.body.reply).toBe('Please confirm [date of birth hidden] in the secure box on the page.');
+    const stored = (await browser.get(`/chat/${res.body.conversationId}`)).body[1].text;
+    expect(stored).not.toContain('1990-01-15');
+  });
+
   it('if the agent service is down, the patient gets a clear 503', async () => {
     t.agent.respond = async () => {
       throw new Error('connection refused');

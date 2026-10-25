@@ -10,6 +10,7 @@ import { Clock } from '../clock.js';
 import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
 import { AgentClient } from './agent-client.js';
+import { redactDateOfBirth } from './redact.js';
 
 export const CHAT_LIMIT = { messages: 20, windowMinutes: 10 };
 export const MAX_MESSAGE_CHARS = 1000;
@@ -127,7 +128,7 @@ export class ChatController {
       throw httpError(HttpStatus.SERVICE_UNAVAILABLE, 'AGENT_UNAVAILABLE', 'The assistant is unavailable right now. Please try again.');
     }
 
-    const reply = turn.reply.trim() || 'Sorry, I could not answer that. Could you rephrase?';
+    const reply = redactDateOfBirth(turn.reply.trim(), patient?.dateOfBirth) || 'Sorry, I could not answer that. Could you rephrase?';
     const answeredAt = this.clock.now();
     await this.prisma.$transaction([
       this.prisma.chatMessage.create({
