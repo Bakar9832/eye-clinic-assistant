@@ -101,8 +101,12 @@ export const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     'Appointment types (code, name, how long the patient should expect, preparation) and which doctors do each.',
   check_availability:
     'Free start times for an appointment type, by clinic day. Times are clinic time (with the viewer\'s time if different). No login needed.',
-  book: 'Book an appointment for the logged-in patient at a free start time from check_availability. Returns the ticket.',
-  reschedule: "Move one of the logged-in patient's own upcoming appointments, by its reference, to a new free time.",
+  book:
+    'Book an appointment for the logged-in patient. Checks the time itself and refuses, with the reason, if it is ' +
+    'not free, so there is no need to call check_availability first. Returns the ticket.',
+  reschedule:
+    "Move one of the logged-in patient's own upcoming appointments, by its reference, to a new time. Checks the " +
+    'new time itself and refuses, with the reason, if it is not free.',
   cancel: "Cancel one of the logged-in patient's own upcoming appointments, by its reference.",
   get_my_appointments: "The logged-in patient's appointments, with references and status.",
   get_my_outcome:

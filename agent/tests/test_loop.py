@@ -163,9 +163,12 @@ async def test_the_prompt_separates_book_now_ask_first_and_offer_alternatives():
     await run_turn(turn_request(), llm_for(fake), FakeTools())
 
     prompt = fake.calls[0]["messages"][0]["content"]
-    assert "If it's free, book it now, in this same reply" in prompt
+    # Qwen 3.5 9B always stopped to ask after check_availability, so an instruction goes
+    # straight to book, which checks the time itself.
+    assert "Call book straight away, without check_availability" in prompt
     assert "If it's free, say so and ask if you should book it" in prompt
     assert "offer up to four free times, the closest to what they asked for" in prompt
-    assert "book it right away without asking again" in prompt
+    assert "call book right away without asking again" in prompt
+    assert "cancel it straight away. Ask only if two or more appointments could match" in prompt
     assert "Never book or move to a time the patient hasn't asked for or agreed to" in prompt
     assert "Hand each question to staff once" in prompt
