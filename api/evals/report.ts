@@ -90,6 +90,28 @@ export function markdownReport(results: EvalResults): string {
   return lines.join('\n') + '\n';
 }
 
+/**
+ * The README table across models: one column per result file (model and prompt), so a
+ * local model and Gemini can be read side by side, each against its own baseline. The
+ * last rows say how many runs and when, because older results may be on an older prompt.
+ */
+export function modelsTable(all: EvalResults[]): string {
+  const order = (r: EvalResults) => r.variant === 'full' ? 0 : 1;
+  const sorted = [...all].sort((a, b) => a.model.localeCompare(b.model) || order(a) - order(b));
+  const cells = (f: (r: EvalResults) => string) => sorted.map(f).join(' | ');
+  const c = sorted.map(costs);
+  return [
+    `| Category | ${cells((r) => `${r.model} · ${r.variant === 'full' ? 'full prompt' : 'minimal baseline'}`)} |`,
+    `|---|${sorted.map(() => '---|').join('')}`,
+    ...CATEGORIES.map((cat) => `| ${cat.replaceAll('_', ' ')} | ${cells((r) => pct(passRate(r, cat)))} |`),
+    `| **Overall** | ${cells((r) => `**${pct(passRate(r))}**`)} |`,
+    `| Seconds per conversation (mean / p95) | ${c.map((x) => `${x.meanSeconds.toFixed(1)} / ${x.p95Seconds.toFixed(1)}`).join(' | ')} |`,
+    `| Tokens per conversation | ${c.map((x) => Math.round(x.meanTokens)).join(' | ')} |`,
+    `| Cases × runs | ${cells((r) => `${r.cases.length} × ${r.repeats}`)} |`,
+    `| Measured | ${cells((r) => r.startedAt.slice(0, 10))} |`,
+  ].join('\n');
+}
+
 /** The README table: the real prompt against the minimal baseline. */
 export function comparisonTable(full: EvalResults, minimal: EvalResults): string {
   const rows = CATEGORIES.map((cat) => `| ${cat.replaceAll('_', ' ')} | ${pct(passRate(full, cat))} | ${pct(passRate(minimal, cat))} |`);

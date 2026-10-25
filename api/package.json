@@ -24,7 +24,8 @@
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
-    "eval": "tsc -p tsconfig.evals.json && node .eval-build/evals/run.js"
+    "eval": "tsc -p tsconfig.evals.json && node .eval-build/evals/run.js",
+    "eval:table": "tsc -p tsconfig.evals.json && node .eval-build/evals/table.js"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.0",
