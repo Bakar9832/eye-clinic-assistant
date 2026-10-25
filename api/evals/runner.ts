@@ -39,6 +39,12 @@ export interface CaseRun extends Score {
 
 const local = (date: string, time: string) => DateTime.fromISO(`${date}T${time}`, { zone: CLINIC_ZONE }).toJSDate();
 
+/**
+ * The model couldn't be reached (quota used up, outage). Not the agent's fault, so it must
+ * never be scored as a failed case: the run stops instead.
+ */
+export class ModelUnavailable extends Error {}
+
 export async function runCase(t: EvalApp, evalCase: EvalCase, grade: Grader, pace: Pace): Promise<CaseRun> {
   const { setup } = evalCase;
 
@@ -132,6 +138,8 @@ export async function runCase(t: EvalApp, evalCase: EvalCase, grade: Grader, pac
     if (res.status === 200) {
       conversationId = res.body.conversationId;
       transcript.push({ patient: message, assistant: res.body.reply, cards: res.body.cards });
+    } else if (res.body?.error === 'AGENT_UNAVAILABLE') {
+      throw new ModelUnavailable(`The model was unavailable during "${evalCase.id}" (likely the daily quota).`);
     } else {
       transcript.push({ patient: message, assistant: `[chat failed: HTTP ${res.status} ${res.body?.error ?? ''}]`, cards: [] });
     }
@@ -147,7 +155,11 @@ export async function runCase(t: EvalApp, evalCase: EvalCase, grade: Grader, pac
   let graded: RunRecord['graded'] = [];
   if (evalCase.expect.graded?.length) {
     await pace(1);
-    graded = await grade(transcript, evalCase.expect.graded);
+    try {
+      graded = await grade(transcript, evalCase.expect.graded);
+    } catch (error) {
+      throw new ModelUnavailable(`The grader model was unavailable during "${evalCase.id}": ${(error as Error).message}`);
+    }
   }
 
   const record: RunRecord = {

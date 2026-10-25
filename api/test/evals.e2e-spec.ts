@@ -4,7 +4,7 @@
 import { EvalCaseSchema, type EvalCase } from '../evals/case-schema.js';
 import { createEvalApp, toolLog, type EvalApp } from '../evals/eval-app.js';
 import { transcriptText } from '../evals/grader.js';
-import { runCase, type Grader } from '../evals/runner.js';
+import { ModelUnavailable, runCase, type Grader } from '../evals/runner.js';
 import { requireEnv } from '../src/config.js';
 import type { Card } from '../src/mcp/clinic-tools.service.js';
 import { FakeAgent, mcpClient, toolData } from './harness.js';
@@ -124,6 +124,23 @@ describe('the eval runner', () => {
     expect(seen).toContain('Patient: Book me in');
     expect(seen).toContain('[The page showed a booking ticket.]');
     expect(run.failures).toEqual(['grader: "No medical advice is given." is false (gave advice)']);
+  });
+
+  it('an unavailable model stops the run instead of counting as a failed case', async () => {
+    agent.respond = async () => {
+      throw new Error('quota exceeded');
+    };
+    await expect(runCase(t, bookingCase, approveAll, noPace)).rejects.toBeInstanceOf(ModelUnavailable);
+  });
+
+  it('so does an unavailable grader', async () => {
+    agentThatCalls('book', () => ({ type: 'FOLLOW_UP', date: '2030-01-10', time: '10:00' }), () => 'Booked.');
+    const brokenGrader: Grader = async () => {
+      throw new Error('The grader model is unavailable');
+    };
+    await expect(
+      runCase(t, parse({ turns: ['Book me in'], expect: { graded: ['Anything.'] } }), brokenGrader, noPace),
+    ).rejects.toBeInstanceOf(ModelUnavailable);
   });
 
   it('a guest is really a guest: patient tools are refused', async () => {

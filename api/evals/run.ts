@@ -15,7 +15,7 @@ import { EvalCaseSchema, type EvalCase } from './case-schema.js';
 import { createEvalApp, RecordingHttpAgent } from './eval-app.js';
 import { createGrader } from './grader.js';
 import { caseResult, comparisonTable, markdownReport, passRate, type EvalResults } from './report.js';
-import { runCase, type Pace } from './runner.js';
+import { ModelUnavailable, runCase, type Pace } from './runner.js';
 
 // Run from api/ (npm run eval). The compiled runner lives in .eval-build/, so paths are
 // taken from the working directory, not from this file.
@@ -121,16 +121,23 @@ async function main() {
   });
 
   const results: EvalResults = { variant, model, repeats, startedAt: new Date().toISOString(), cases: [] };
+  let stoppedEarly: string | null = null;
   try {
     await waitFor(`${process.env.AGENT_URL}/health`, agent);
     console.log(`Running ${cases.length} case(s) × ${repeats}, ${variant} prompt, model ${model}\n`);
 
     for (const evalCase of cases) {
       const runs = [];
-      for (let i = 0; i < repeats; i++) {
-        const run = await runCase(t, evalCase, grade, pace);
-        pace.record(run.usage.llmCalls + (evalCase.expect.graded?.length ? 1 : 0));
-        runs.push(run);
+      try {
+        for (let i = 0; i < repeats; i++) {
+          const run = await runCase(t, evalCase, grade, pace);
+          pace.record(run.usage.llmCalls + (evalCase.expect.graded?.length ? 1 : 0));
+          runs.push(run);
+        }
+      } catch (error) {
+        if (!(error instanceof ModelUnavailable)) throw error;
+        stoppedEarly = error.message;
+        break;
       }
       const result = caseResult(evalCase.id, evalCase.category, runs);
       results.cases.push(result);
@@ -144,6 +151,19 @@ async function main() {
 
   const outDir = path.join(HERE, 'results');
   fs.mkdirSync(outDir, { recursive: true });
+
+  if (stoppedEarly) {
+    // Never let an outage pass as agent failures, or overwrite a complete earlier result.
+    fs.writeFileSync(path.join(outDir, `${variant}.incomplete.json`), JSON.stringify({ ...results, stoppedEarly }, null, 2));
+    console.error(
+      `\nStopped after ${results.cases.length} of ${cases.length} case(s): ${stoppedEarly}\n` +
+        `Nothing was scored as a failure because of it. Partial results: evals/results/${variant}.incomplete.json.\n` +
+        `Try again once the quota resets, or switch LLM_* in .env to another model.`,
+    );
+    process.exitCode = 2;
+    return;
+  }
+
   fs.writeFileSync(path.join(outDir, `${variant}.json`), JSON.stringify(results, null, 2));
   const report = markdownReport(results);
   fs.writeFileSync(path.join(outDir, `${variant}.md`), report);
