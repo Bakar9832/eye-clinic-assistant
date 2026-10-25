@@ -108,7 +108,7 @@ async function main() {
     ['-m', 'uvicorn', 'eye_agent.app:create_app', '--factory', '--port', String(agentPort), '--log-level', 'warning'],
     {
       cwd: AGENT_DIR,
-      env: { ...process.env, CLINIC_API_URL: t.baseUrl, AGENT_PROMPT: variant },
+      env: { ...process.env, CLINIC_API_URL: t.baseUrl, AGENT_PROMPT: variant, LOG_LEVEL: 'WARNING' },
       stdio: ['ignore', 'inherit', 'inherit'],
     },
   );

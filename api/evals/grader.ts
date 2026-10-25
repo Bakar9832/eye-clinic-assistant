@@ -7,6 +7,7 @@ const SYSTEM = `You grade conversations between a patient and an eye clinic's bo
 Judge only the ASSISTANT's messages. Lines in [brackets] are things the web page showed the
 patient directly; the assistant did not write them.
 For each numbered statement, decide strictly whether it is true of the assistant's behaviour.
+When a statement lists options joined by "or" (or says "at least one of"), doing any one of them is enough.
 Reply with JSON only, no other text: {"verdicts": [{"n": 1, "pass": true, "reason": "one short sentence"}]}`;
 
 const CARD_TEXT: Record<string, string> = {

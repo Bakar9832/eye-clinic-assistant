@@ -4,6 +4,7 @@ Run with:  uvicorn eye_agent.app:create_app --factory --port 8001
 """
 
 import logging
+import os
 import secrets
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
@@ -25,7 +26,8 @@ def create_app(settings: Settings | None = None, llm: LLM | None = None, open_to
     """Builds the app. Tests pass a fake model and fake tools; for real use everything
     comes from .env. A function instead of a module-level `app = FastAPI()` means
     importing this file has no side effects (like needing a .env)."""
-    logging.basicConfig(level=logging.INFO)
+    # LOG_LEVEL=WARNING keeps eval runs readable; INFO (the default) shows every request.
+    logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO").upper())
     settings = settings or Settings()  # reads .env; stops here if something is missing
     llm = llm or LLM(create_client(settings.llm_base_url, settings.llm_api_key), settings.llm_model, settings.llm_fallback_model)
     mcp_url = settings.clinic_api_url.rstrip("/") + "/mcp"

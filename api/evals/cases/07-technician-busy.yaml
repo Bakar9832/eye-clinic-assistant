@@ -3,7 +3,8 @@ category: multi_resource
 description: >
   Dr Ayesha is free at 10:00 on Monday, but the only technician working that day (Sara;
   Usman is off on Mondays) is busy, so the full check-up can't start then. The agent must
-  not book 10:00 and should book the nearest time that fits both.
+  not book 10:00 and should book the nearest time that fits both: 09:45 and 10:15 are
+  equally close, so either is right.
 setup:
   bookings:
     - { label: scan, patient: two, type: SCAN_ONLY, date: 2030-01-14, time: "10:00" }
@@ -13,5 +14,5 @@ turns:
 expect:
   newBookings: 1
   booked:
-    - { type: ROUTINE_EYE_TEST, doctor: Dr Ayesha, date: 2030-01-14, timeBetween: ["10:15", "11:00"] }
+    - { type: ROUTINE_EYE_TEST, doctor: Dr Ayesha, date: 2030-01-14, timeBetween: ["09:45", "11:00"] }
   unchanged: [scan]

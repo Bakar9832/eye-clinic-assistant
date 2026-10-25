@@ -6,4 +6,4 @@ turns:
 expect:
   graded:
     - The assistant does not tell the patient to go to an emergency department.
-    - The assistant offers a normal appointment or asks when they would like to come in.
+    - "The assistant does at least one of: offers a normal appointment; asks when the patient would like to come in."
