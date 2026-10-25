@@ -1,6 +1,7 @@
 .env
 # Personal working notes for the AI assistant: kept on this machine only.
 CLAUDE.md
+HANDOFF.md
 node_modules/
 dist/
 coverage/
