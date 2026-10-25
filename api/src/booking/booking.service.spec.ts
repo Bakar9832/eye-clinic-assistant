@@ -1,7 +1,7 @@
 // Database tests: run against TEST_DATABASE_URL, which is wiped and re-seeded before each test.
 
 import { seedClinic } from '../../prisma/clinic-data.js';
-import { AuditService } from '../audit/audit.service.js';
+import { AuditService, SYSTEM } from '../audit/audit.service.js';
 import { AvailabilityService } from '../availability/availability.service.js';
 import { KARACHI, LONG_AGO, MON, local, startTimes } from '../availability/test-fixtures.js';
 import { isOverlapViolation } from '../prisma/db-errors.js';
@@ -246,6 +246,71 @@ describe('BookingService.reschedule', () => {
     });
     expect(after.startsAt).toEqual(loser.startsAt); // untouched
     expect(after.allocations).toHaveLength(1); // still holding its original time
+  });
+});
+
+describe('One upcoming booking per type and day, for patients', () => {
+  const followUp = (time: string, now = LONG_AGO, day = MON) =>
+    booking.book(clinic.patients.demo.id, { typeCode: 'FOLLOW_UP', start: local(day, time) }, now);
+
+  it('D1. a second follow-up the same day is refused, naming the one already booked', async () => {
+    const first = await followUp('09:00');
+
+    const second = followUp('15:00');
+    await expectRefusal(second, 'ALREADY_BOOKED', ['ALREADY_BOOKED']);
+
+    const error = (await second.then(
+      () => undefined,
+      (e: unknown) => e,
+    )) as SchedulingError;
+    expect(error.reasons[0].message).toContain(first.reference);
+    expect(error.reasons[0].message).toContain('09:00');
+    expect(await prisma.appointment.count()).toBe(1);
+  });
+
+  it('D2. a different type the same day, or the same type another day, is fine', async () => {
+    await followUp('09:00');
+
+    await booking.book(clinic.patients.demo.id, { typeCode: 'SCAN_ONLY', start: local(MON, '11:00') }, LONG_AGO);
+    await followUp('09:00', LONG_AGO, '2030-01-08');
+
+    expect(await prisma.appointment.count()).toBe(3);
+  });
+
+  it('D3. after missing a morning visit, the patient can book again that afternoon', async () => {
+    await followUp('09:00');
+
+    // Noon: the 09:00 visit is in the past, still BOOKED, because nobody came.
+    const again = await followUp('15:00', local(MON, '12:00'));
+
+    expect(again.status).toBe('BOOKED');
+  });
+
+  it('D4. a cancelled one does not count', async () => {
+    const first = await followUp('09:00');
+    await booking.cancel(clinic.patients.demo.id, first.id, LONG_AGO);
+
+    await expect(followUp('15:00')).resolves.toMatchObject({ status: 'BOOKED' });
+  });
+
+  it('D5. moving within the same day is fine; moving onto a day that already has one is refused', async () => {
+    const monday = await followUp('09:00');
+    const tuesday = await followUp('09:00', LONG_AGO, '2030-01-08');
+
+    await booking.reschedule(clinic.patients.demo.id, monday.id, { start: local(MON, '11:00') }, LONG_AGO);
+    await expectRefusal(
+      booking.reschedule(clinic.patients.demo.id, tuesday.id, { start: local(MON, '15:00') }, LONG_AGO),
+      'ALREADY_BOOKED',
+    );
+  });
+
+  it('D6. another patient is not affected, and staff can still book a second one', async () => {
+    await followUp('09:00');
+
+    await booking.book(clinic.patients.two.id, { typeCode: 'FOLLOW_UP', start: local(MON, '09:30') }, LONG_AGO);
+    await booking.bookByStaff(clinic.patients.demo.id, { typeCode: 'FOLLOW_UP', start: local(MON, '15:00') }, LONG_AGO, SYSTEM);
+
+    expect(await prisma.appointment.count({ where: { patientId: clinic.patients.demo.id } })).toBe(2);
   });
 });
 

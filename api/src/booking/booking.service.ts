@@ -46,6 +46,7 @@ export class BookingService {
 
   async book(patientId: string, request: BookingRequest, now = new Date(), actor: Actor = SYSTEM) {
     await this.requireCompleteProfile(patientId);
+    await this.refuseSameTypeSameDay(patientId, request.typeCode, request.start, now);
     const query = { typeCode: request.typeCode, day: await this.clinicDay(request.start), doctorId: request.doctorId, now };
     return this.placeOnSlot(query, request.start, now, (slot, typeId) => this.createAppointment(patientId, typeId, slot, actor));
   }
@@ -116,6 +117,7 @@ export class BookingService {
     });
     if (!appointment) throw notFound();
     if (appointment.status !== 'BOOKED' || appointment.startsAt <= now) throw notChangeable();
+    await this.refuseSameTypeSameDay(patientId, appointment.appointmentType.code, request.start, now, appointmentId);
 
     const doctorId =
       request.doctorId ?? appointment.allocations.find((a) => a.resource.kind === 'OPTOMETRIST')?.resourceId;
@@ -229,6 +231,44 @@ export class BookingService {
     if (patient.fullName === null || patient.dateOfBirth === null) {
       throw new SchedulingError('PROFILE_INCOMPLETE', [
         { code: 'PROFILE_INCOMPLETE', message: 'Please add your name and date of birth before booking.' },
+      ]);
+    }
+  }
+
+  /**
+   * A patient can't hold two upcoming bookings of the same type on one clinic day: it is
+   * almost always a mistake (the agent once "moved" an appointment by booking a second
+   * one). Only upcoming BOOKED ones count, so after missing a 10:00 visit the patient can
+   * still book 15:00. The refusal names the existing booking, so it can be moved instead.
+   *
+   * Staff bookings skip this check. Known limitation: one account per family, so a parent
+   * booking two children's exams on one day needs reception (or, later, a single longer
+   * "family check-up" type). Not race-proof like double booking: two simultaneous
+   * requests could both pass, which costs a cancellation, not a clash.
+   */
+  private async refuseSameTypeSameDay(patientId: string, typeCode: string, start: Date, now: Date, ignoreId?: string) {
+    const { timezone } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const day = DateTime.fromJSDate(start, { zone: timezone }).startOf('day');
+    const existing = await this.prisma.appointment.findFirst({
+      where: {
+        patientId,
+        status: 'BOOKED',
+        appointmentType: { code: typeCode },
+        startsAt: { gt: now, gte: day.toJSDate(), lt: day.plus({ days: 1 }).toJSDate() },
+        ...(ignoreId ? { id: { not: ignoreId } } : {}),
+      },
+      include: { appointmentType: true },
+      orderBy: { startsAt: 'asc' },
+    });
+    if (existing) {
+      const time = DateTime.fromJSDate(existing.startsAt, { zone: timezone }).toFormat('HH:mm');
+      throw new SchedulingError('ALREADY_BOOKED', [
+        {
+          code: 'ALREADY_BOOKED',
+          message:
+            `You already have a ${existing.appointmentType.name} at ${time} that day (${existing.reference}). ` +
+            'Move that one instead of booking another.',
+        },
       ]);
     }
   }

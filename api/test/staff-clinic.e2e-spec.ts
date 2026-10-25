@@ -23,8 +23,9 @@ afterAll(async () => {
 });
 
 /** The demo patient books a follow-up with the given doctor at 09:00 on DAY; returns its id. */
-async function bookFollowUp(doctor: 'ayesha' | 'bilal' = 'ayesha', time = '09:00') {
-  const patient = await login(t, 'demo.patient@example.com');
+// One patient can hold only one follow-up a day, so a second one goes to another patient.
+async function bookFollowUp(doctor: 'ayesha' | 'bilal' = 'ayesha', time = '09:00', email = 'demo.patient@example.com') {
+  const patient = await login(t, email);
   const res = await patient
     .post('/me/appointments')
     .send({ typeCode: 'FOLLOW_UP', start: iso(time), doctorId: clinic.resources[doctor].id })
@@ -92,7 +93,7 @@ describe('the schedule', () => {
 
   it("marks a doctor's own exams, so the page only offers outcomes there", async () => {
     await bookFollowUp('ayesha', '09:00');
-    await bookFollowUp('bilal', '12:00');
+    await bookFollowUp('bilal', '12:00', 'test.two@example.com');
 
     const ayesha = await staffLogin(t, 'dr.ayesha@clinic.example');
     const mine = (await ayesha.get('/staff/schedule').query({ day: DAY }).expect(200)).body.appointments;
