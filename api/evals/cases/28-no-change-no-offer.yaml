@@ -1,0 +1,12 @@
+id: no-change-no-offer
+category: offers
+description: The example from the project brief. With a no_change outcome there is no offer to make.
+setup:
+  dobVerified: true
+  outcomes:
+    - { patient: demo, code: NO_CHANGE, note: "Your eyes are healthy and your current glasses are still right for you." }
+turns:
+  - Do you have any deals on glasses for me?
+expect:
+  offersShown: 0
+  replyNotMatches: ['\$90', 'two pairs', 'free contact lens trial']

@@ -1,0 +1,12 @@
+id: cancel-unknown-reference
+category: reschedule_cancel
+description: A reference that doesn't exist (or isn't theirs) is reported, and nothing changes.
+setup:
+  bookings:
+    - { label: mine, patient: demo, type: FOLLOW_UP, date: 2030-01-10, time: "10:00", doctor: Dr Ayesha }
+turns:
+  - Cancel booking EC-ZZZZ22 please.
+expect:
+  unchanged: [mine]
+  graded:
+    - The assistant says it could not find that booking (or that it is not the patient's), and does not claim to have cancelled anything.

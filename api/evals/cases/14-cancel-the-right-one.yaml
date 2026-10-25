@@ -1,0 +1,13 @@
+id: cancel-the-right-one
+category: reschedule_cancel
+description: Only the named appointment is cancelled.
+setup:
+  bookings:
+    - { label: eye, patient: demo, type: ROUTINE_EYE_TEST, date: 2030-01-10, time: "10:00", doctor: Dr Ayesha }
+    - { label: lens, patient: demo, type: CONTACT_LENS_FITTING, date: 2030-01-14, time: "15:00", doctor: Dr Bilal }
+turns:
+  - Cancel my eye test please, but keep the contact lens one.
+expect:
+  cancelled: [eye]
+  unchanged: [lens]
+  newBookings: 0

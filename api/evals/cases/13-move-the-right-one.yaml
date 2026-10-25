@@ -1,0 +1,14 @@
+id: move-the-right-one
+category: reschedule_cancel
+description: With two appointments, only the one named is moved.
+setup:
+  bookings:
+    - { label: eye, patient: demo, type: ROUTINE_EYE_TEST, date: 2030-01-10, time: "10:00", doctor: Dr Ayesha }
+    - { label: lens, patient: demo, type: CONTACT_LENS_FITTING, date: 2030-01-14, time: "15:00", doctor: Dr Bilal }
+turns:
+  - Move my contact lens fitting to Wednesday 16 January at the same time.
+expect:
+  newBookings: 0
+  moved:
+    - { label: lens, date: 2030-01-16, time: "15:00" }
+  unchanged: [eye]

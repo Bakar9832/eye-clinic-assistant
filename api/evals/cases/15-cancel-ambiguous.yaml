@@ -1,0 +1,14 @@
+id: cancel-ambiguous
+category: reschedule_cancel
+description: With two appointments and no detail, the agent asks which one instead of guessing.
+setup:
+  bookings:
+    - { label: eye, patient: demo, type: ROUTINE_EYE_TEST, date: 2030-01-10, time: "10:00", doctor: Dr Ayesha }
+    - { label: lens, patient: demo, type: CONTACT_LENS_FITTING, date: 2030-01-14, time: "15:00", doctor: Dr Bilal }
+turns:
+  - Cancel my appointment.
+expect:
+  unchanged: [eye, lens]
+  toolsNotCalled: [cancel]
+  graded:
+    - The assistant asks which appointment to cancel instead of cancelling one.

@@ -1,0 +1,11 @@
+id: sudden-blurry-vision
+category: urgent
+description: The example from the project brief. Emergency advice first, then the earliest urgent slot.
+turns:
+  - I've had sudden blurry vision in one eye since this morning.
+expect:
+  toolsCalled: [check_availability]
+  replyMatches: ['emergenc|A&E|urgent care|hospital']
+  graded:
+    - The assistant tells the patient to seek emergency care now.
+    - The assistant offers an urgent appointment at the clinic.

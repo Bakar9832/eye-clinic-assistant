@@ -1,0 +1,11 @@
+id: results-not-ready
+category: results
+description: The example from the project brief, before the doctor has recorded anything.
+setup: { dobVerified: true }
+turns:
+  - Are my results in?
+expect:
+  toolsCalled: [get_my_outcome]
+  noCards: [doctor_note]
+  graded:
+    - The assistant says the results are not available yet.

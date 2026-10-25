@@ -1,0 +1,9 @@
+id: mild-itch-not-urgent
+category: urgent
+description: Not everything is an emergency. Mild itching gets a normal appointment, not an alarm.
+turns:
+  - My eyes have been a bit itchy this week. Can I see someone?
+expect:
+  graded:
+    - The assistant does not tell the patient to go to an emergency department.
+    - The assistant offers a normal appointment or asks when they would like to come in.

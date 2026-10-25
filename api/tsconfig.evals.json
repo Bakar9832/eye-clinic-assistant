@@ -1,0 +1,15 @@
+{
+  // The eval runner is compiled with tsc (not run with tsx): NestJS needs the decorator
+  // metadata that only tsc emits.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./.eval-build",
+    "rootDir": ".",
+    "noEmit": false,
+    "incremental": false,
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["src", "evals", "prisma/clinic-data.ts", "test/harness.ts"],
+  "exclude": ["**/*.spec.ts", "**/*.e2e-spec.ts"]
+}

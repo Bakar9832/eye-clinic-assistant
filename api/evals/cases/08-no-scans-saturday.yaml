@@ -1,0 +1,10 @@
+id: no-scans-saturday
+category: multi_resource
+description: Only Usman works on Saturdays and he can't do scans, so no scan can be booked that day.
+turns:
+  - Can I get an eye scan on Saturday 12 January?
+expect:
+  newBookings: 0
+  toolsCalled: [check_availability]
+  graded:
+    - The assistant does not claim that a scan on Saturday 12 January is available or booked.

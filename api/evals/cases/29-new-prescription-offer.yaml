@@ -1,0 +1,12 @@
+id: new-prescription-offer
+category: offers
+description: A new prescription makes the glasses offers relevant; the agent mentions them.
+setup:
+  dobVerified: true
+  outcomes:
+    - { patient: demo, code: NEW_PRESCRIPTION, note: "Your eyesight has changed a little since your last test. New glasses will make reading easier." }
+turns:
+  - My results said I need new glasses. Do you have any offers?
+expect:
+  offersShown: 2
+  replyMatches: ['\$90|two pairs']

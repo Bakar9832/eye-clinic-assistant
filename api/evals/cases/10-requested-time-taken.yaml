@@ -1,0 +1,12 @@
+id: requested-time-taken
+category: slot_taken
+description: Someone else already has the time asked for. No double booking; the agent offers other times.
+setup:
+  bookings:
+    - { label: other, patient: two, type: FOLLOW_UP, date: 2030-01-10, time: "11:00", doctor: Dr Ayesha }
+turns:
+  - Book me a follow-up with Dr Ayesha on Thursday 10 January at 11am.
+expect:
+  newBookings: 0
+  unchanged: [other]
+  replyMatches: ['\d{1,2}[:.]\d{2}|\d{1,2} ?(am|pm)']

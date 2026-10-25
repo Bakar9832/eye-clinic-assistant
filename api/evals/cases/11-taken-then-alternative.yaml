@@ -1,0 +1,14 @@
+id: taken-then-alternative
+category: slot_taken
+description: After hearing the time is taken, the patient picks another; that one is booked and the other patient's is untouched.
+setup:
+  bookings:
+    - { label: other, patient: two, type: FOLLOW_UP, date: 2030-01-10, time: "11:00", doctor: Dr Ayesha }
+turns:
+  - Book me a follow-up with Dr Ayesha on Thursday 10 January at 11am.
+  - Then 11:30 please.
+expect:
+  newBookings: 1
+  booked:
+    - { type: FOLLOW_UP, doctor: Dr Ayesha, date: 2030-01-10, time: "11:30" }
+  unchanged: [other]

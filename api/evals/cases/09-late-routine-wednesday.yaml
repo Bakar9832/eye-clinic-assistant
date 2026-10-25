@@ -1,0 +1,9 @@
+id: late-routine-wednesday
+category: multi_resource
+description: At 5:30pm on a Wednesday only Usman (until 18:00) and Dr Bilal (until 20:00) are in; the booking must use both.
+turns:
+  - Book a routine eye test on Wednesday 16 January at 5:30pm.
+expect:
+  newBookings: 1
+  booked:
+    - { type: ROUTINE_EYE_TEST, doctor: Dr Bilal, date: 2030-01-16, time: "17:30" }

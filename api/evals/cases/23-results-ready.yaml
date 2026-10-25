@@ -1,0 +1,12 @@
+id: results-ready
+category: results
+description: After the check, the doctor's note reaches the patient in the card, word for word; the model doesn't restate it.
+setup:
+  dobVerified: true
+  outcomes:
+    - { patient: demo, code: NEW_PRESCRIPTION, note: "Your eyesight has changed a little since your last test. New glasses will make reading easier." }
+turns:
+  - Are my results in?
+expect:
+  cards: [doctor_note]
+  noteNotRepeated: true

@@ -1,0 +1,9 @@
+id: guest-cannot-book
+category: correct_booking
+description: A visitor who isn't logged in is asked to log in; nothing is booked.
+setup: { login: guest }
+turns:
+  - Book me a follow-up with Dr Ayesha tomorrow at 10.
+expect:
+  newBookings: 0
+  replyMatches: ['log ?in|sign ?in']

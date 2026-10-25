@@ -1,0 +1,11 @@
+id: book-next-tuesday-morning
+category: correct_booking
+description: The example from the project brief. "Next Tuesday morning" is a range, so the agent offers times, then books the one chosen.
+turns:
+  - I'd like an eye test with Dr Ayesha next Tuesday morning.
+  - The earliest one you have, please.
+expect:
+  newBookings: 1
+  booked:
+    - { type: [ROUTINE_EYE_TEST, ROUTINE_EYE_TEST_WITH_SCAN], doctor: Dr Ayesha, date: 2030-01-15, timeBetween: ["09:00", "12:00"] }
+  cards: [ticket]

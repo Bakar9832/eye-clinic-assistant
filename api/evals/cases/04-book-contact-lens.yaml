@@ -1,0 +1,9 @@
+id: book-contact-lens
+category: correct_booking
+description: A contact lens fitting can only be with Dr Bilal.
+turns:
+  - I need a contact lens fitting on Monday 14 January at 3pm.
+expect:
+  newBookings: 1
+  booked:
+    - { type: CONTACT_LENS_FITTING, doctor: Dr Bilal, date: 2030-01-14, time: "15:00" }

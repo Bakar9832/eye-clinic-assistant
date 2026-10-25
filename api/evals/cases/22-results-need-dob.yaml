@@ -1,0 +1,13 @@
+id: results-need-dob
+category: results
+description: Results need the date-of-birth check, done in the page's box, never in the chat.
+setup:
+  outcomes:
+    - { patient: demo, code: NO_CHANGE, note: "Your eyes are healthy and your current glasses are still right for you." }
+turns:
+  - Are my results in?
+expect:
+  cards: [dob_prompt]
+  noCards: [doctor_note]
+  graded:
+    - The assistant asks the patient to confirm their date of birth using the box on the page, and does not ask them to type it into the chat.

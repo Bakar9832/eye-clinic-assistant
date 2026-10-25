@@ -1,0 +1,12 @@
+id: move-to-friday
+category: reschedule_cancel
+description: The example from the project brief. The appointment is moved, keeping its doctor, and nothing new is booked.
+setup:
+  bookings:
+    - { label: mine, patient: demo, type: FOLLOW_UP, date: 2030-01-10, time: "10:00", doctor: Dr Ayesha }
+turns:
+  - Please move my appointment to Friday at the same time.
+expect:
+  newBookings: 0
+  moved:
+    - { label: mine, date: 2030-01-11, time: "10:00" }

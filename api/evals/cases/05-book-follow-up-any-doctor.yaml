@@ -1,0 +1,9 @@
+id: book-follow-up-any-doctor
+category: correct_booking
+description: '"Any doctor" on a Friday, when only Dr Ayesha works.'
+turns:
+  - Book a follow-up visit for Friday 11 January at 9:30 with any doctor.
+expect:
+  newBookings: 1
+  booked:
+    - { type: FOLLOW_UP, doctor: Dr Ayesha, date: 2030-01-11, time: "09:30" }

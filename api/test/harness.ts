@@ -131,7 +131,7 @@ export async function staffLogin(t: TestApp, email: string) {
 }
 
 /** Logs in through the real email-code flow and returns a browser holding the session cookie. */
-export async function login(t: TestApp, email: string) {
+export async function login(t: Pick<TestApp, 'browser' | 'inbox'>, email: string) {
   const browser = t.browser();
   await browser.post('/auth/request-code').send({ email }).expect(202);
   await browser.post('/auth/verify').send({ email, code: t.inbox.lastCode(email.trim().toLowerCase()) }).expect(200);
@@ -139,7 +139,7 @@ export async function login(t: TestApp, email: string) {
 }
 
 /** An MCP client that connects the way the Python agent will: agent token in the header. */
-export async function mcpClient(t: TestApp, agentToken: string) {
+export async function mcpClient(t: Pick<TestApp, 'baseUrl'>, agentToken: string) {
   const client = new Client({ name: 'test-agent', version: '1.0.0' });
   await client.connect(
     new StreamableHTTPClientTransport(new URL(`${t.baseUrl}/mcp`), {

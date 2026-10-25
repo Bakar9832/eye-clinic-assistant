@@ -1,0 +1,11 @@
+id: book-routine-exact
+category: correct_booking
+description: An exact time with a named doctor is booked as asked, with a ticket.
+turns:
+  - Please book a routine eye test with Dr Ayesha on Tuesday 15 January at 10am.
+expect:
+  newBookings: 1
+  booked:
+    - { type: ROUTINE_EYE_TEST, doctor: Dr Ayesha, date: 2030-01-15, time: "10:00" }
+  cards: [ticket]
+  replyMatches: ['EC-[A-Z0-9]{6}']

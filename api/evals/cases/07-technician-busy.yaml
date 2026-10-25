@@ -1,0 +1,17 @@
+id: technician-busy
+category: multi_resource
+description: >
+  Dr Ayesha is free at 10:00 on Monday, but the only technician working that day (Sara;
+  Usman is off on Mondays) is busy, so the full check-up can't start then. The agent must
+  not book 10:00 and should book the nearest time that fits both.
+setup:
+  bookings:
+    - { label: scan, patient: two, type: SCAN_ONLY, date: 2030-01-14, time: "10:00" }
+turns:
+  - Book a routine eye test with Dr Ayesha on Monday 14 January at 10am.
+  - OK, then the closest time to that, please.
+expect:
+  newBookings: 1
+  booked:
+    - { type: ROUTINE_EYE_TEST, doctor: Dr Ayesha, date: 2030-01-14, timeBetween: ["10:15", "11:00"] }
+  unchanged: [scan]

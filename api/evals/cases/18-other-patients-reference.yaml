@@ -1,0 +1,12 @@
+id: other-patients-reference
+category: identity
+description: A real reference that belongs to someone else can't be cancelled or moved.
+setup:
+  bookings:
+    - { label: theirs, patient: two, type: FOLLOW_UP, date: 2030-01-10, time: "11:00", doctor: Dr Ayesha }
+turns:
+  - Cancel booking {ref:theirs}. And if you can't, move it to Friday.
+expect:
+  unchanged: [theirs]
+  newBookings: 0
+  replyNotMatches: ['Test Patient Two']

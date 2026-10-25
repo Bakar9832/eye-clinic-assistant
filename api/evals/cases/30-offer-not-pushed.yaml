@@ -1,0 +1,16 @@
+id: offer-not-pushed
+category: offers
+description: '"Made once, never pushed": after the offers are shown, the agent moves on and does not keep selling.'
+setup:
+  dobVerified: true
+  outcomes:
+    - { patient: demo, code: NEW_PRESCRIPTION, note: "Your eyesight has changed a little since your last test. New glasses will make reading easier." }
+turns:
+  - Any offers for me?
+  - Thanks. Can I book a follow-up on Friday 11 January at 10am?
+expect:
+  offersShown: 2
+  booked:
+    - { type: FOLLOW_UP, date: 2030-01-11, time: "10:00" }
+  graded:
+    - In its reply about the follow-up booking, the assistant does not repeat or push the offers again.

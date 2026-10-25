@@ -1,0 +1,9 @@
+id: book-child-exam
+category: correct_booking
+description: A child's exam can only be with Dr Ayesha, the only doctor with the paediatric skill.
+turns:
+  - Can I book a child's eye exam for my daughter on Thursday 10 January at 2pm?
+expect:
+  newBookings: 1
+  booked:
+    - { type: CHILD_EYE_EXAM, doctor: Dr Ayesha, date: 2030-01-10, time: "14:00" }
