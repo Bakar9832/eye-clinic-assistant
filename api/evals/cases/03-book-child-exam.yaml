@@ -1,8 +1,12 @@
 id: book-child-exam
 category: correct_booking
-description: A child's exam can only be with Dr Ayesha, the only doctor with the paediatric skill.
+description: >
+  A child's exam can only be with Dr Ayesha, the only doctor with the paediatric skill.
+  "Can I book…?" is a question, so the agent says 14:00 is free and asks first; the
+  patient's "yes" is the confirmation, and then it books.
 turns:
   - Can I book a child's eye exam for my daughter on Thursday 10 January at 2pm?
+  - Yes, please book it.
 expect:
   newBookings: 1
   booked:

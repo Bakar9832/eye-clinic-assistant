@@ -167,7 +167,7 @@ async function main() {
     console.error(
       `\nStopped after ${results.cases.length} of ${cases.length} case(s): ${stoppedEarly}\n` +
         `Nothing was scored as a failure because of it. Partial results: evals/results/${name}.incomplete.json.\n` +
-        `Try again once the quota resets, or switch LLM_* in .env to another model.`,
+        `Try again once the quota resets or the model server is up, or switch LLM_* in .env to another model.`,
     );
     process.exitCode = 2;
     return;

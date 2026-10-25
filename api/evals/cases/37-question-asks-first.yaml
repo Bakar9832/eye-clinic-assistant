@@ -1,0 +1,12 @@
+id: question-asks-first
+category: correct_booking
+description: >
+  A question about a free time ("Can I book…?") is not an instruction to book. The agent
+  says 14:00 is free and asks whether to book it; nothing is booked yet.
+turns:
+  - Can I book a child's eye exam for my daughter on Thursday 10 January at 2pm?
+expect:
+  newBookings: 0
+  replyMatches: ['14[:.]00|2 ?pm']
+  graded:
+    - The assistant says 2pm (14:00) is free and asks whether it should book it, without claiming to have booked anything.

@@ -139,7 +139,7 @@ export async function runCase(t: EvalApp, evalCase: EvalCase, grade: Grader, pac
       conversationId = res.body.conversationId;
       transcript.push({ patient: message, assistant: res.body.reply, cards: res.body.cards });
     } else if (res.body?.error === 'AGENT_UNAVAILABLE') {
-      throw new ModelUnavailable(`The model was unavailable during "${evalCase.id}" (likely the daily quota).`);
+      throw new ModelUnavailable(`The model was unavailable during "${evalCase.id}" (a hosted model: rate limit or daily quota; a local one: is its server running?).`);
     } else {
       transcript.push({ patient: message, assistant: `[chat failed: HTTP ${res.status} ${res.body?.error ?? ''}]`, cards: [] });
     }

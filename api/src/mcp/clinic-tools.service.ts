@@ -77,6 +77,25 @@ export const TOOL_INPUTS = {
 
 export type ToolName = keyof typeof TOOL_INPUTS;
 
+/**
+ * The inputs as the model sees them: `type` lists the clinic's real codes, each with its
+ * name. With only a format and one example, a small model copied the example
+ * (ROUTINE_EYE_TEST) for a follow-up instead of looking the code up. The codes are read
+ * from the database, so a new appointment type reaches the tools without a code change.
+ */
+export function toolInputs(types: { code: string; name: string }[]) {
+  if (types.length === 0) return TOOL_INPUTS;
+  const [first, ...rest] = types.map((t) => t.code);
+  const type = z
+    .enum([first, ...rest])
+    .describe(`The appointment type code: ${types.map((t) => `${t.code} = ${t.name}`).join(', ')}.`);
+  return {
+    ...TOOL_INPUTS,
+    check_availability: TOOL_INPUTS.check_availability.extend({ type }),
+    book: TOOL_INPUTS.book.extend({ type }),
+  };
+}
+
 export const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
   list_appointment_types:
     'Appointment types (code, name, how long the patient should expect, preparation) and which doctors do each.',
@@ -121,6 +140,16 @@ export class ClinicToolsService {
     private readonly audit: AuditService,
     private readonly clock: Clock,
   ) {}
+
+  /** The tool inputs to advertise, with the active appointment types as of now. */
+  async inputs() {
+    const types = await this.prisma.appointmentType.findMany({
+      where: { active: true },
+      select: { code: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+    return toolInputs(types);
+  }
 
   /** Runs one tool. Refusals come back as data the model can explain, not as crashes. */
   async call(name: ToolName, rawArgs: unknown, who: AgentIdentity): Promise<ToolResult> {

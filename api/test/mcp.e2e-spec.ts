@@ -106,6 +106,37 @@ describe('T3. no tool can be told whose data to use', () => {
   });
 });
 
+describe('T3b. appointment types the model can choose from', () => {
+  it("book and check_availability list the clinic's real codes, each with its name", async () => {
+    const client = await mcpClient(t, await agentTokenFor(t, t.browser()));
+    const { tools } = await client.listTools();
+
+    for (const name of ['book', 'check_availability']) {
+      const type = tools.find((tool) => tool.name === name)!.inputSchema.properties!.type as { enum: string[]; description: string };
+      expect(type.enum, name).toContain('FOLLOW_UP');
+      expect(type.enum, name).toContain('CHILD_EYE_EXAM');
+      expect(type.description, name).toContain('FOLLOW_UP = Follow-up visit');
+    }
+  });
+
+  it('a code that is not one of them is refused and nothing is booked', async () => {
+    const { client } = await asPatient();
+    const result = await call(client, 'book', { type: 'FOLLOWUP_VISIT', date: MON, time: '09:30' });
+
+    expect(result.isError).toBe(true);
+    expect(await t.prisma.appointment.count()).toBe(0);
+  });
+
+  it('a type switched off by staff disappears from the list', async () => {
+    await t.prisma.appointmentType.update({ where: { code: 'SCAN_ONLY' }, data: { active: false } });
+    const client = await mcpClient(t, await agentTokenFor(t, t.browser()));
+    const { tools } = await client.listTools();
+
+    const type = tools.find((tool) => tool.name === 'book')!.inputSchema.properties!.type as { enum: string[] };
+    expect(type.enum).not.toContain('SCAN_ONLY');
+  });
+});
+
 describe('T2. without login', () => {
   it('public tools work; patient tools say LOGIN_REQUIRED', async () => {
     const client = await mcpClient(t, await agentTokenFor(t, t.browser()));

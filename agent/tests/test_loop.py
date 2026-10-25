@@ -156,11 +156,16 @@ async def test_the_minimal_baseline_prompt_has_the_date_but_none_of_the_rules():
     assert "medical advice" not in prompt and "HARD RULES" not in prompt
 
 
-async def test_the_prompt_says_to_confirm_alternatives_and_hand_off_once():
+async def test_the_prompt_separates_book_now_ask_first_and_offer_alternatives():
+    # A 9B model asked "would you like me to book it?" even for "Book … at 3pm", so the
+    # three cases are spelled out, and so is what counts as the patient's confirmation.
     fake = FakeOpenAI([answer("Hi")])
     await run_turn(turn_request(), llm_for(fake), FakeTools())
 
     prompt = fake.calls[0]["messages"][0]["content"]
-    assert "offer up to three times that are actually free" in prompt
-    assert "book or move only to a time the patient has confirmed" in prompt
+    assert "If it's free, book it now, in this same reply" in prompt
+    assert "If it's free, say so and ask if you should book it" in prompt
+    assert "offer up to four free times, the closest to what they asked for" in prompt
+    assert "book it right away without asking again" in prompt
+    assert "Never book or move to a time the patient hasn't asked for or agreed to" in prompt
     assert "Hand each question to staff once" in prompt

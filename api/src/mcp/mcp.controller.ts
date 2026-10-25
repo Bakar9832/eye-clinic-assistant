@@ -32,12 +32,13 @@ export class McpController {
     }
 
     const server = new McpServer({ name: 'eye-clinic', version: '1.0.0' });
+    const inputs = await this.tools.inputs();
     for (const name of Object.keys(TOOL_INPUTS) as ToolName[]) {
       server.registerTool(
         name,
         {
           description: TOOL_DESCRIPTIONS[name],
-          inputSchema: TOOL_INPUTS[name],
+          inputSchema: inputs[name],
           annotations: { readOnlyHint: READ_ONLY.includes(name) },
         },
         async (args: unknown) => {
