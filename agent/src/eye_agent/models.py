@@ -40,7 +40,18 @@ class TurnRequest(ApiModel):
     context: TurnContext
 
 
+class Usage(ApiModel):
+    """What one turn cost, for the evals' cost and latency report."""
+
+    llm_calls: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    tool_calls: int = 0
+    models: list[str] = []
+
+
 class TurnResponse(ApiModel):
     reply: str
     # Shown by the web page next to the reply (ticket, doctor's note, date-of-birth box).
     cards: list[dict[str, Any]] = []
+    usage: Usage = Usage()

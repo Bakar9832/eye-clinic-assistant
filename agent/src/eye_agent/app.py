@@ -49,11 +49,11 @@ def create_app(settings: Settings | None = None, llm: LLM | None = None, open_to
 
         try:
             async with open_tools(request.agent_token) as tools:
-                result = await run_turn(request, llm, tools)
+                result = await run_turn(request, llm, tools, prompt=settings.agent_prompt)
         except LLMUnavailable as error:
             # The API turns this into "The assistant is unavailable right now".
             raise HTTPException(status_code=503, detail="The language model is unavailable") from error
 
-        return TurnResponse(reply=result.reply, cards=result.cards)
+        return TurnResponse(reply=result.reply, cards=result.cards, usage=result.usage)
 
     return app

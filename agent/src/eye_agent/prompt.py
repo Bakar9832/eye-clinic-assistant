@@ -8,6 +8,14 @@ doctor's note never reaches the model. The prompt only makes good behaviour like
 from .models import TurnContext
 
 
+def build_minimal_prompt(context: TurnContext) -> str:
+    """The evals' baseline: the same tools and today's date, and nothing else."""
+    return (
+        f"You are an assistant for {context.clinic_name}, an eye clinic. "
+        f"Today is {context.weekday} {context.today} ({context.clinic_timezone}). Use the tools to help."
+    )
+
+
 def build_system_prompt(context: TurnContext) -> str:
     login = (
         "The visitor is logged in. Tools act for them automatically; you never need or use a name or id."

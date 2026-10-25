@@ -5,6 +5,7 @@ or LM Studio means changing LLM_BASE_URL and LLM_MODEL in .env.
 """
 
 from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -30,3 +31,7 @@ class Settings(BaseSettings):
     agent_service_key: str
     # The agent reaches the tools at {clinic_api_url}/mcp.
     clinic_api_url: str = "http://localhost:3000"
+
+    # "full" is the real prompt. "minimal" is the evals' baseline: the same agent and
+    # tools with almost no instructions, to measure what the real prompt adds.
+    agent_prompt: Literal["full", "minimal"] = "full"

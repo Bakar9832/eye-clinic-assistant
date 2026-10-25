@@ -11,7 +11,8 @@ from typing import Any
 
 from .llm import LLM
 from .models import TurnRequest
-from .prompt import build_system_prompt
+from .models import Usage
+from .prompt import build_minimal_prompt, build_system_prompt
 from .tools import ToolBox
 
 log = logging.getLogger("eye_agent.loop")
@@ -29,25 +30,36 @@ TOO_MANY_STEPS = (
 class TurnResult:
     reply: str
     cards: list[dict[str, Any]] = field(default_factory=list)
-    tool_calls: int = 0
+    usage: Usage = field(default_factory=Usage)
 
 
-async def run_turn(request: TurnRequest, llm: LLM, tools: ToolBox, max_tool_calls: int = MAX_TOOL_CALLS) -> TurnResult:
+async def run_turn(
+    request: TurnRequest,
+    llm: LLM,
+    tools: ToolBox,
+    max_tool_calls: int = MAX_TOOL_CALLS,
+    prompt: str = "full",
+) -> TurnResult:
     # 1. What the model reads: the rules, then the conversation so far.
     #    Note what's NOT here: the agent token. It stays inside `tools`.
-    messages: list[dict[str, Any]] = [{"role": "system", "content": build_system_prompt(request.context)}]
+    system = build_minimal_prompt(request.context) if prompt == "minimal" else build_system_prompt(request.context)
+    messages: list[dict[str, Any]] = [{"role": "system", "content": system}]
     messages += [{"role": m.role, "content": m.text} for m in request.messages]
 
     cards: list[dict[str, Any]] = []
-    calls = 0
+    usage = Usage()
 
     while True:
         # 2. Ask the model. It either answers, or asks for one or more tools.
         completion = await llm.complete(messages, tools.schemas)
+        usage.llm_calls += 1
+        usage.prompt_tokens += completion.prompt_tokens
+        usage.completion_tokens += completion.completion_tokens
+        usage.models.append(completion.model)
 
         if not completion.tool_calls:
             # 3a. An answer: the turn is done.
-            return TurnResult(reply=(completion.text or "").strip(), cards=cards, tool_calls=calls)
+            return TurnResult(reply=(completion.text or "").strip(), cards=cards, usage=usage)
 
         # 3b. Tool requests. The model's request goes into the history first, so it can
         #     match each result to what it asked for (by the call's id). It goes in
@@ -55,10 +67,10 @@ async def run_turn(request: TurnRequest, llm: LLM, tools: ToolBox, max_tool_call
         messages.append(completion.assistant_message)
 
         for call in completion.tool_calls:
-            if calls >= max_tool_calls:
-                log.warning("Stopped after %d tool calls", calls)
-                return TurnResult(reply=TOO_MANY_STEPS, cards=cards, tool_calls=calls)
-            calls += 1
+            if usage.tool_calls >= max_tool_calls:
+                log.warning("Stopped after %d tool calls", usage.tool_calls)
+                return TurnResult(reply=TOO_MANY_STEPS, cards=cards, usage=usage)
+            usage.tool_calls += 1
 
             # 4. Run the tool. Problems become results the model can read and react to
             #    ("that time is taken"), not crashes that end the conversation.

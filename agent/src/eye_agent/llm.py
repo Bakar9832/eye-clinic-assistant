@@ -34,6 +34,8 @@ class Completion:
     model: str = ""
     # The model's message exactly as the provider sent it, for the conversation history.
     assistant_message: dict[str, Any] = field(default_factory=dict)
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
 
 
 class LLMUnavailable(Exception):
@@ -86,11 +88,14 @@ class LLM:
                     ToolCall(id=call.id, name=call.function.name, arguments=call.function.arguments or "{}")
                     for call in (message.tool_calls or [])
                 ]
+                usage = getattr(response, "usage", None)  # some providers omit it
                 return Completion(
                     text=message.content,
                     tool_calls=tool_calls,
                     model=model,
                     assistant_message=_as_sent(message, tool_calls),
+                    prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
+                    completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
                 )
         raise LLMUnavailable(f"No model answered: {', '.join(self.models)}")
 

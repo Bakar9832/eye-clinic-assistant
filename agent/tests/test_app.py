@@ -53,7 +53,9 @@ def test_a_turn_returns_the_reply_and_the_cards_and_uses_the_turn_token_for_tool
     res = client.post("/turn", json=body("Book me"), headers={"X-Agent-Service-Key": KEY})
 
     assert res.status_code == 200
-    assert res.json() == {"reply": "Booked: EC-ABC234.", "cards": [card]}
+    data = res.json()
+    assert (data["reply"], data["cards"]) == ("Booked: EC-ABC234.", [card])
+    assert (data["usage"]["llmCalls"], data["usage"]["toolCalls"]) == (2, 1)
     assert seen == ["SECRET-AGENT-TOKEN-123"]
 
 

@@ -135,3 +135,21 @@ async def test_the_models_own_message_goes_back_exactly_as_the_provider_sent_it(
 
     echoed = fake.calls[1]["messages"][-2]
     assert echoed["tool_calls"][0]["extra_content"] == {"google": {"thought_signature": "SIGNED-BY-GEMINI"}}
+
+
+async def test_usage_is_counted_for_the_evals():
+    fake = FakeOpenAI([tool_call("list_appointment_types", {}), answer("Done.")])
+    tools = FakeTools({"list_appointment_types": ToolOutcome(text="{}")})
+
+    result = await run_turn(turn_request(), llm_for(fake), tools)
+
+    assert (result.usage.llm_calls, result.usage.tool_calls, result.usage.models) == (2, 1, ["main-model", "main-model"])
+
+
+async def test_the_minimal_baseline_prompt_has_the_date_but_none_of_the_rules():
+    fake = FakeOpenAI([answer("Hi")])
+    await run_turn(turn_request(), llm_for(fake), FakeTools(), prompt="minimal")
+
+    prompt = fake.calls[0]["messages"][0]["content"]
+    assert "Tuesday 2030-01-01" in prompt
+    assert "medical advice" not in prompt and "HARD RULES" not in prompt
