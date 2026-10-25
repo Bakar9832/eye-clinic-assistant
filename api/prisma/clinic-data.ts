@@ -22,6 +22,7 @@ export const BILAL_DAYS = [1, 3, 4];
  */
 export async function seedClinic(prisma: PrismaClient, timezone: string) {
   // Children first, so foreign keys don't block the wipe. Sessions go with their owners.
+  await prisma.notification.deleteMany();
   await prisma.loginCode.deleteMany();
   await prisma.handoffRequest.deleteMany();
   await prisma.conversation.deleteMany();
@@ -121,6 +122,7 @@ export async function seedClinic(prisma: PrismaClient, timezone: string) {
       code: 'ROUTINE_EYE_TEST',
       name: 'Routine eye test',
       typicalMin: 25,
+      annualReminder: true,
       prepInstructions: glassesAndMedicines + dilationWarning,
       steps: numbered([pretest, exam(10, 20)]),
     },
@@ -128,6 +130,7 @@ export async function seedClinic(prisma: PrismaClient, timezone: string) {
       code: 'ROUTINE_EYE_TEST_WITH_SCAN',
       name: 'Routine eye test with scan',
       typicalMin: 35,
+      annualReminder: true,
       prepInstructions: glassesAndMedicines + dilationWarning,
       steps: numbered([pretest, exam(10, 20), ...scanAt(30)]),
     },
@@ -163,6 +166,7 @@ export async function seedClinic(prisma: PrismaClient, timezone: string) {
       code: 'CHILD_EYE_EXAM',
       name: "Child's eye exam",
       typicalMin: 35,
+      annualReminder: true,
       prepInstructions: 'A parent or guardian must attend. Bring any glasses the child already has.',
       steps: numbered([pretest, exam(10, 30, Skill.PAEDIATRIC)]),
     },

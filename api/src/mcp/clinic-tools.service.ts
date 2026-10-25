@@ -467,7 +467,7 @@ function dobRequired(): ToolResult {
 }
 
 /** The doctor for the appointment's current time (older holds remain from reschedules). */
-function doctorOf(a: {
+export function doctorOf(a: {
   startsAt: Date;
   endsAt: Date;
   allocations: { startsAt: Date; endsAt: Date; resource: { kind: string; displayName: string } }[];

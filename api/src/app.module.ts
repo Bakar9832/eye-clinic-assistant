@@ -25,7 +25,9 @@ import { createValidationPipe } from './http/validation.pipe.js';
 import { MeController } from './me/me.controller.js';
 import { MyAppointmentsController } from './me/my-appointments.controller.js';
 import { MyResultsController } from './me/my-results.controller.js';
-import { ConsoleEmailSender, EmailSender } from './notifications/email-sender.js';
+import { EmailSender, emailSenderFromEnv } from './notifications/email-sender.js';
+import { NotificationsService } from './notifications/notifications.service.js';
+import { NotificationsWorker } from './notifications/notifications.worker.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { SchedulingErrorFilter } from './scheduling-error.filter.js';
 import { OutcomesService } from './outcomes/outcomes.service.js';
@@ -64,9 +66,11 @@ import { StaffGuard } from './staff/staff.guard.js';
     AuthService,
     SessionGuard,
     StaffGuard,
+    NotificationsService,
+    NotificationsWorker,
     // Swapped for fakes in tests.
     { provide: Clock, useClass: SystemClock },
-    { provide: EmailSender, useClass: ConsoleEmailSender },
+    { provide: EmailSender, useFactory: () => emailSenderFromEnv() },
     { provide: AgentClient, useClass: HttpAgentClient },
     { provide: APP_FILTER, useClass: SchedulingErrorFilter },
     { provide: APP_PIPE, useFactory: createValidationPipe },

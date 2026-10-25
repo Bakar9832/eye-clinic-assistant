@@ -49,6 +49,10 @@ model ClinicSetting {
   offerRecheckAfterNewPrescription Boolean @default(false) @map("offer_recheck_after_new_prescription")
   /// How long after first recording an outcome its doctor may still correct it.
   outcomeEditWindowHours Int @default(72) @map("outcome_edit_window_hours")
+  /// The appointment reminder email goes out this many hours before the start.
+  reminderHoursBefore Int @default(24) @map("reminder_hours_before")
+  /// The yearly check-up email goes out this many months after the last annual-type visit.
+  annualReminderMonths Int @default(11) @map("annual_reminder_months")
 
   @@map("clinic_settings")
 }
@@ -131,6 +135,9 @@ model AppointmentType {
   typicalMin       Int                   @map("typical_min")
   prepInstructions String                @map("prep_instructions")
   isUrgent         Boolean               @default(false) @map("is_urgent")
+  /// Visits that should happen every year (e.g. the routine eye test): the patient gets
+  /// a check-up reminder when the last one is ClinicSetting.annualReminderMonths old.
+  annualReminder   Boolean               @default(false) @map("annual_reminder")
   active           Boolean               @default(true)
   steps            AppointmentTypeStep[]
   appointments     Appointment[]
@@ -175,6 +182,7 @@ model Patient {
   sessions     Session[]
   conversations Conversation[]
   handoffs     HandoffRequest[]
+  notifications Notification[]
 
   @@map("patients")
 }
@@ -264,9 +272,37 @@ model Appointment {
   cancelledAt       DateTime?            @map("cancelled_at") @db.Timestamptz(3)
   allocations       ResourceAllocation[]
   outcome           Outcome?
+  notifications     Notification[]
 
   @@index([patientId])
   @@map("appointments")
+}
+
+enum NotificationType {
+  APPOINTMENT_REMINDER
+  ANNUAL_CHECKUP
+}
+
+/// One email the clinic sends on its own (not login codes). The row is written BEFORE
+/// sending, as a claim: the unique (type, dedupe_key) means each email goes out once,
+/// even if two workers run at the same moment. sentAt stays empty until delivery
+/// succeeds; a failed send deletes the claim so the next run tries again.
+model Notification {
+  id            String           @id @default(uuid()) @db.Uuid
+  type          NotificationType
+  /// What makes it "the same email": an appointment and its start time for a reminder
+  /// (moving it earns a new one), the visit it follows for the yearly check-up.
+  dedupeKey     String           @map("dedupe_key")
+  patientId     String           @map("patient_id") @db.Uuid
+  patient       Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointmentId String?          @map("appointment_id") @db.Uuid
+  appointment   Appointment?     @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  claimedAt     DateTime         @map("claimed_at") @db.Timestamptz(3)
+  sentAt        DateTime?        @map("sent_at") @db.Timestamptz(3)
+
+  @@unique([type, dedupeKey])
+  @@index([patientId])
+  @@map("notifications")
 }
 
 /// The four results a doctor can record. The agent may read only this and the note.
