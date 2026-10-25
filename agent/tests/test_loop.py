@@ -81,7 +81,8 @@ async def test_p4_the_agent_token_and_the_cards_never_reach_the_model():
 
     result = await run_turn(request, llm_for(fake), tools)
 
-    everything_sent = json.dumps(fake.calls)
+    # default=str: unset options are sent as the library's `omit` marker, not JSON.
+    everything_sent = json.dumps(fake.calls, default=str)
     assert "SECRET-AGENT-TOKEN-123" not in everything_sent
     assert "PRIVATE NOTE FROM THE DOCTOR" not in everything_sent
     # ...but the page still gets the card.

@@ -57,9 +57,12 @@ class LLM:
         fallback_model: str | None = None,
         retry_delays: Sequence[float] = (1.0, 3.0),
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        reasoning_effort: str | None = None,
     ) -> None:
         self.client = client
         self.models = [model] + ([fallback_model] if fallback_model and fallback_model != model else [])
+        # None or "" means "don't send it", so providers without the field never see it.
+        self.reasoning_effort = reasoning_effort or None
         self.retry_delays = list(retry_delays)
         # Injected so tests don't actually wait.
         self.sleep = sleep
@@ -75,6 +78,7 @@ class LLM:
                         tools=tools or openai.omit,
                         # Low randomness: we want the same sensible tool use every time.
                         temperature=0.2,
+                        reasoning_effort=self.reasoning_effort or openai.omit,
                     )
                 except RETRYABLE as error:
                     log.warning("Model %s failed (try %d): %s", model, attempt + 1, type(error).__name__)
@@ -121,7 +125,7 @@ def _as_sent(message: Any, tool_calls: list[ToolCall]) -> dict[str, Any]:
     return sent
 
 
-def create_client(base_url: str, api_key: str) -> openai.AsyncOpenAI:
+def create_client(base_url: str, api_key: str, timeout: float = 60.0) -> openai.AsyncOpenAI:
     # max_retries=0: the library would otherwise retry on its own, hidden from us.
     # We do it ourselves above, so the fallback logic and tests see every attempt.
-    return openai.AsyncOpenAI(base_url=base_url, api_key=api_key, max_retries=0, timeout=60.0)
+    return openai.AsyncOpenAI(base_url=base_url, api_key=api_key, max_retries=0, timeout=timeout)

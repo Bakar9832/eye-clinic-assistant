@@ -73,6 +73,41 @@ async def test_tools_are_sent_when_there_are_some_and_left_out_when_not():
     assert fake.calls[1]["tools"] is openai.omit
 
 
+async def test_reasoning_effort_is_sent_only_when_configured():
+    # "none" turns thinking off on Qwen 3.5 (Ollama); providers without the field never see it.
+    fake = FakeOpenAI([answer("a"), answer("b"), answer("c")])
+
+    await LLM(fake, "main", reasoning_effort="none").complete([], [])
+    await LLM(fake, "main").complete([], [])
+    await LLM(fake, "main", reasoning_effort="").complete([], [])  # an empty .env line
+
+    assert fake.calls[0]["reasoning_effort"] == "none"
+    assert fake.calls[1]["reasoning_effort"] is openai.omit
+    assert fake.calls[2]["reasoning_effort"] is openai.omit
+
+
+def test_thinking_and_timeout_come_from_settings(monkeypatch):
+    for name, value in {
+        "LLM_BASE_URL": "http://localhost:11434/v1",
+        "LLM_API_KEY": "ollama",
+        "LLM_MODEL": "qwen3.5-9b-16k",
+        "AGENT_SERVICE_KEY": "k",
+    }.items():
+        monkeypatch.setenv(name, value)
+    for name in ["LLM_REASONING_EFFORT", "LLM_TIMEOUT_SECONDS"]:
+        monkeypatch.delenv(name, raising=False)
+
+    defaults = Settings(_env_file=None)
+    assert defaults.llm_reasoning_effort is None
+    assert create_client(defaults.llm_base_url, defaults.llm_api_key, defaults.llm_timeout_seconds).timeout == 60.0
+
+    monkeypatch.setenv("LLM_REASONING_EFFORT", "none")
+    monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "180")
+    local = Settings(_env_file=None)
+    assert local.llm_reasoning_effort == "none"
+    assert create_client(local.llm_base_url, local.llm_api_key, local.llm_timeout_seconds).timeout == 180.0
+
+
 def test_p5_the_model_comes_only_from_settings_so_switching_is_a_config_change(monkeypatch):
     for name, value in {
         "LLM_BASE_URL": "http://localhost:11434/v1",

@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     llm_model: str
     # Optional: tried when the main model keeps failing.
     llm_fallback_model: str | None = None
+    # Optional: how hard a "thinking" model thinks before answering, sent as the standard
+    # reasoning_effort field. "none" turns thinking off (Qwen 3.5 on Ollama thinks by
+    # default, which doubles the time per call). Empty = the provider's own default.
+    llm_reasoning_effort: str | None = None
+    # How long one model call may take. Local models on a home GPU are slower than Gemini.
+    llm_timeout_seconds: float = 60.0
 
     # Only the clinic API may ask the agent to run a turn; it proves it with this key.
     agent_service_key: str

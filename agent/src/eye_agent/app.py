@@ -29,7 +29,12 @@ def create_app(settings: Settings | None = None, llm: LLM | None = None, open_to
     # LOG_LEVEL=WARNING keeps eval runs readable; INFO (the default) shows every request.
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO").upper())
     settings = settings or Settings()  # reads .env; stops here if something is missing
-    llm = llm or LLM(create_client(settings.llm_base_url, settings.llm_api_key), settings.llm_model, settings.llm_fallback_model)
+    llm = llm or LLM(
+        create_client(settings.llm_base_url, settings.llm_api_key, settings.llm_timeout_seconds),
+        settings.llm_model,
+        settings.llm_fallback_model,
+        reasoning_effort=settings.llm_reasoning_effort,
+    )
     mcp_url = settings.clinic_api_url.rstrip("/") + "/mcp"
     open_tools = open_tools or (lambda token: McpToolBox.open(mcp_url, token))
 

@@ -1,0 +1,14 @@
+# The local agent model: Qwen 3.5 9B with a context window big enough for the agent.
+#
+# Each agent call sends about 6,000 tokens (rules, nine tool descriptions, history).
+# Ollama's default context is smaller and it silently cuts off the start, so the model
+# would lose its rules and tool list. 16k fits on a 16 GB GPU (about 6 GB in use).
+#
+# Build it once (from the repo root), then put LLM_MODEL="qwen3.5-9b-16k" in .env:
+#   ollama pull qwen3.5:9b
+#   ollama create qwen3.5-9b-16k -f agent/ollama/Modelfile
+#
+# Thinking is switched off in .env (LLM_REASONING_EFFORT="none"), not here.
+
+FROM qwen3.5:9b
+PARAMETER num_ctx 16384
