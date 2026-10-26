@@ -50,6 +50,7 @@ export class NotificationsService {
     const due = await this.notYetClaimed([
       ...(await this.dueReminders(settings, now)),
       ...(await this.dueCheckups(settings, now)),
+      ...(await this.dueGlasses(settings)),
     ]);
 
     const result: RunResult = { sent: 0, failed: 0 };
@@ -189,6 +190,37 @@ export class NotificationsService {
           },
         };
       });
+  }
+
+  /** Glasses staff marked as ready. Keyed by the outcome: one email per pair. */
+  private async dueGlasses(settings: Settings): Promise<Due[]> {
+    const ready = await this.prisma.outcome.findMany({
+      where: {
+        glassesReadyAt: { not: null },
+        appointment: {
+          patient: { isDemo: false },
+          // Only ones not emailed yet, so this doesn't grow with every pair ever made.
+          notifications: { none: { type: 'GLASSES_READY' } },
+        },
+      },
+      include: { appointment: { include: { patient: true } } },
+    });
+    return ready.map((o) => ({
+      type: 'GLASSES_READY',
+      dedupeKey: o.id,
+      patientId: o.appointment.patientId,
+      appointmentId: o.appointmentId,
+      email: {
+        to: o.appointment.patient.email,
+        subject: 'Your glasses are ready to collect',
+        text: [
+          `Hello ${o.appointment.patient.fullName ?? 'there'},`,
+          '',
+          `Your new glasses are ready to collect from ${settings.name}.`,
+          `Please bring your booking reference (${o.appointment.reference}) when you come.`,
+        ].join('\n'),
+      },
+    }));
   }
 }
 

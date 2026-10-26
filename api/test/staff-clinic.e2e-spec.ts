@@ -275,3 +275,67 @@ describe('correcting an outcome', () => {
     await ayesha.put(`/staff/appointments/${id}/outcome`).send(outcome()).expect(409);
   });
 });
+
+describe('glasses ready', () => {
+  /** Dr Ayesha examines the demo patient at 09:00 and records this outcome; returns the appointment id. */
+  async function examWith(code: string) {
+    const id = await bookFollowUp();
+    t.clock.set(local('09:20'));
+    const ayesha = await staffLogin(t, 'dr.ayesha@clinic.example');
+    await ayesha.post(`/staff/appointments/${id}/outcome`).send(outcome(code)).expect(201);
+    return id;
+  }
+
+  it('G1. reception marks a new prescription ready; the time is saved and audited', async () => {
+    const id = await examWith('NEW_PRESCRIPTION');
+    const reception = await staffLogin(t, 'reception@clinic.example');
+
+    const res = await reception.post(`/staff/appointments/${id}/glasses-ready`).send({}).expect(200);
+
+    expect(res.body).toEqual({ appointmentId: id, glassesReadyAt: local('09:20').toISOString() });
+    const audit = await t.prisma.auditEvent.findFirst({ where: { action: 'GLASSES_READY', entityId: id } });
+    expect(audit).not.toBeNull();
+  });
+
+  it('G2. refused for another outcome, no outcome, twice, or a patient', async () => {
+    const noChange = await examWith('NO_CHANGE');
+    const reception = await staffLogin(t, 'reception@clinic.example');
+    expect((await reception.post(`/staff/appointments/${noChange}/glasses-ready`).send({}).expect(409)).body.error).toBe('NO_NEW_GLASSES');
+
+    const notExamined = await bookFollowUp('bilal', '12:00', 'test.two@example.com');
+    await reception.post(`/staff/appointments/${notExamined}/glasses-ready`).send({}).expect(404);
+    await reception.post('/staff/appointments/not-a-uuid/glasses-ready').send({}).expect(404);
+
+    await t.prisma.outcome.update({ where: { appointmentId: noChange }, data: { code: 'NEW_PRESCRIPTION' } });
+    await reception.post(`/staff/appointments/${noChange}/glasses-ready`).send({}).expect(200);
+    expect((await reception.post(`/staff/appointments/${noChange}/glasses-ready`).send({}).expect(409)).body.error).toBe('ALREADY_MARKED');
+
+    const patient = await login(t, 'demo.patient@example.com');
+    await patient.post(`/staff/appointments/${noChange}/glasses-ready`).send({}).expect(401);
+  });
+
+  it('G4. the patient sees when the glasses are ready, after the date-of-birth check', async () => {
+    const id = await examWith('NEW_PRESCRIPTION');
+    const patient = await login(t, 'demo.patient@example.com');
+    await patient.post('/me/verify-dob').send({ dateOfBirth: '1990-01-15' }).expect(200);
+    expect((await patient.get('/me/outcome').expect(200)).body.glassesReadyAt).toBeNull();
+
+    const reception = await staffLogin(t, 'reception@clinic.example');
+    await reception.post(`/staff/appointments/${id}/glasses-ready`).send({}).expect(200);
+
+    expect((await patient.get('/me/outcome').expect(200)).body.glassesReadyAt).toBe(local('09:20').toISOString());
+  });
+
+  it('G5. the Glasses list shows only new prescriptions still waiting', async () => {
+    const waiting = await examWith('NEW_PRESCRIPTION');
+    const reception = await staffLogin(t, 'reception@clinic.example');
+
+    const list = (await reception.get('/staff/glasses').expect(200)).body;
+    expect(list).toEqual([
+      { appointmentId: waiting, reference: expect.any(String), patient: { fullName: 'Demo Patient' }, examDate: iso('09:00'), doctor: 'Dr Ayesha' },
+    ]);
+
+    await reception.post(`/staff/appointments/${waiting}/glasses-ready`).send({}).expect(200);
+    expect((await reception.get('/staff/glasses').expect(200)).body).toEqual([]);
+  });
+});

@@ -18,6 +18,8 @@ export type ResultView =
       recordedAt: string;
       edited: boolean;
       editedAt: string | null;
+      /** Only for a new prescription: when its glasses were ready to collect, or null. */
+      glassesReadyAt: string | null;
     };
 
 /**
@@ -57,6 +59,7 @@ export class ResultsService {
       // The patient is told when a doctor has corrected a result.
       edited: outcome.correctedAt !== null,
       editedAt: outcome.correctedAt?.toISOString() ?? null,
+      glassesReadyAt: outcome.glassesReadyAt?.toISOString() ?? null,
     };
   }
 }

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { DateTime } from 'luxon';
 import { api, ApiError, errorText } from '../api/client';
 import type { Result } from '../api/types';
 import { useApp } from '../app-context';
@@ -29,9 +30,16 @@ export function ResultsPage() {
   } else {
     const r = result.data;
     body = (
-      <DoctorNoteCard
-        card={{ type: 'doctor_note', note: r.doctorNote, doctorName: r.doctorName, recordedAt: r.recordedAt, edited: r.edited, editedAt: r.editedAt }}
-      />
+      <>
+        <DoctorNoteCard
+          card={{ type: 'doctor_note', note: r.doctorNote, doctorName: r.doctorName, recordedAt: r.recordedAt, edited: r.edited, editedAt: r.editedAt }}
+        />
+        {r.glassesReadyAt && (
+          <p role="status" className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-emerald-900">
+            Your glasses are ready to collect (since {DateTime.fromISO(r.glassesReadyAt).toFormat('d LLLL')}).
+          </p>
+        )}
+      </>
     );
   }
 

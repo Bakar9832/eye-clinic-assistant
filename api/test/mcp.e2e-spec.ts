@@ -48,6 +48,7 @@ async function recordOutcome(code: string, note = NOTE, email = DEMO) {
   t.clock.set(DateTime.fromISO(`${MON}T09:20`, { zone: ZONE }).toJSDate());
   const ayesha = await staffLogin(t, 'dr.ayesha@clinic.example');
   await ayesha.post(`/staff/appointments/${booked.body.id}/outcome`).send({ code, patientNote: note }).expect(201);
+  return booked.body.id as string;
 }
 
 describe('T1. the agent token', () => {
@@ -310,6 +311,21 @@ describe('T6. results through the agent', () => {
     expect(forModel).not.toContain('Line one');
     expect(forModel).not.toContain('prescription changed');
     expect(cardsOf(result)).toEqual([expect.objectContaining({ type: 'doctor_note', note: NOTE, doctorName: 'Dr Ayesha' })]);
+  });
+
+  it('G6. "are my glasses ready?": a new prescription says so; other results say nothing about glasses', async () => {
+    const id = await recordOutcome('NEW_PRESCRIPTION');
+    const { browser, client } = await asPatient();
+    await browser.post('/me/verify-dob').send({ dateOfBirth: DEMO_DOB }).expect(200);
+    expect(toolData(await call(client, 'get_my_outcome'))).toMatchObject({ glasses_ready: false, glasses_ready_on: null });
+
+    const reception = await staffLogin(t, 'reception@clinic.example');
+    await reception.post(`/staff/appointments/${id}/glasses-ready`).send({}).expect(200);
+
+    expect(toolData(await call(client, 'get_my_outcome'))).toMatchObject({ glasses_ready: true, glasses_ready_on: MON });
+
+    await t.prisma.outcome.update({ where: { appointmentId: id }, data: { code: 'NO_CHANGE' } });
+    expect(toolData(await call(client, 'get_my_outcome'))).not.toHaveProperty('glasses_ready');
   });
 });
 

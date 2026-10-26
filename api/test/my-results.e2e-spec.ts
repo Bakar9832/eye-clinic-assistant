@@ -93,7 +93,7 @@ describe('reading the result', () => {
     expect(res.body.doctorNote).toBe(TRICKY_NOTE);
   });
 
-  it('P8. only the outcome, the note, the date, the type and the doctor', async () => {
+  it('P8. only the outcome, the note, the date, the type, the doctor and whether glasses are ready', async () => {
     await resultFor(DEMO);
     const patient = await login(t, DEMO);
     await patient.post('/me/verify-dob').send({ dateOfBirth: DEMO_DOB }).expect(200);
@@ -108,6 +108,7 @@ describe('reading the result', () => {
       recordedAt: local('09:20').toISOString(),
       edited: false,
       editedAt: null,
+      glassesReadyAt: null,
     });
   });
 

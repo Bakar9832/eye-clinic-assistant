@@ -96,6 +96,27 @@ export class StaffClinicController {
     return { id, status: 'CLOSED' };
   }
 
+  /** New-prescription results still waiting for glasses. Names only, nothing clinical beyond "new glasses". */
+  @Get('glasses')
+  async glassesWaiting() {
+    const waiting = await this.outcomes.waitingForGlasses();
+    return waiting.map((o) => ({
+      appointmentId: o.appointmentId,
+      reference: o.appointment.reference,
+      patient: { fullName: o.appointment.patient.fullName },
+      examDate: o.appointment.startsAt.toISOString(),
+      doctor: o.recordedBy.displayName,
+    }));
+  }
+
+  /** Any staff role: reception usually unpacks the glasses. */
+  @Post('appointments/:id/glasses-ready')
+  @HttpCode(HttpStatus.OK)
+  async glassesReady(@CurrentStaff() staff: StaffActor, @Param('id') id: string) {
+    const outcome = await this.outcomes.markGlassesReady(staff, id, this.clock.now());
+    return { appointmentId: id, glassesReadyAt: outcome.glassesReadyAt!.toISOString() };
+  }
+
   /** A doctor reads the outcome of their own exam, to correct it. */
   @Get('appointments/:id/outcome')
   @Roles(['DOCTOR'])

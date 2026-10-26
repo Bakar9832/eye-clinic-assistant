@@ -50,9 +50,9 @@ describe('A1. staff login', () => {
 
 describe('A2. what each role sees', () => {
   it.each([
-    [DOCTOR, ['Schedule', 'Handoffs']],
-    [RECEPTION, ['Schedule', 'Handoffs', 'New booking']],
-    [ADMIN, ['Schedule', 'Handoffs', 'New booking', 'Settings']],
+    [DOCTOR, ['Schedule', 'Handoffs', 'Glasses']],
+    [RECEPTION, ['Schedule', 'Handoffs', 'Glasses', 'New booking']],
+    [ADMIN, ['Schedule', 'Handoffs', 'Glasses', 'New booking', 'Settings']],
   ])('%s', async (me, links) => {
     staffApi(me);
     renderApp('/admin');
@@ -178,6 +178,39 @@ describe('A6. handoffs', () => {
     expect(screen.getByText('Guest (not logged in)')).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: 'Mark as handled' })[0]);
     expect(api.calls.some((c) => c.method === 'POST' && c.path === '/staff/handoffs/h1/close')).toBe(true);
+  });
+});
+
+describe('A6b. glasses', () => {
+  const waiting = { appointmentId: 'a1', reference: 'EC-ABC234', patient: { fullName: 'Demo Patient' }, examDate: '2030-01-07T04:00:00.000Z', doctor: 'Dr Ayesha' };
+  afterEach(() => vi.restoreAllMocks());
+
+  it('lists the waiting glasses and marks one ready after confirming', async () => {
+    let marked = false;
+    const api = staffApi(RECEPTION, {
+      'GET /staff/glasses': () => ({ body: marked ? [] : [waiting] }),
+      'POST /staff/appointments/a1/glasses-ready': () => ((marked = true), { body: { appointmentId: 'a1', glassesReadyAt: '2030-01-14T07:00:00.000Z' } }),
+    });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderApp('/admin/glasses');
+
+    expect(await screen.findByText('Demo Patient')).toBeInTheDocument();
+    expect(screen.getByText(/Exam 7 Jan 2030 · Dr Ayesha · EC-ABC234/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Glasses ready' }));
+
+    expect(window.confirm).toHaveBeenCalledWith("Email Demo Patient that their glasses are ready? This can't be undone.");
+    expect(api.calls.some((c) => c.method === 'POST' && c.path === '/staff/appointments/a1/glasses-ready')).toBe(true);
+    expect(await screen.findByText('No glasses waiting.')).toBeInTheDocument();
+  });
+
+  it('cancelling the confirmation sends nothing', async () => {
+    const api = staffApi(RECEPTION, { 'GET /staff/glasses': { body: [waiting] } });
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderApp('/admin/glasses');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Glasses ready' }));
+
+    expect(api.calls.some((c) => c.method === 'POST')).toBe(false);
   });
 });
 

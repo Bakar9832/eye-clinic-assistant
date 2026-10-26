@@ -87,6 +87,42 @@ export class OutcomesService {
     });
   }
 
+  /** New-prescription results still waiting for their glasses, longest-waiting first. */
+  waitingForGlasses() {
+    return this.prisma.outcome.findMany({
+      where: { code: 'NEW_PRESCRIPTION', glassesReadyAt: null },
+      orderBy: { recordedAt: 'asc' },
+      include: { appointment: { include: { patient: { select: { fullName: true } } } }, recordedBy: true },
+    });
+  }
+
+  /**
+   * Any staff member marks a new prescription's glasses as ready to collect; the patient
+   * is then emailed once (NotificationsService). There is no undo: the email may already
+   * have gone, so a mistake is fixed by phoning the patient.
+   */
+  async markGlassesReady(staff: StaffActor, appointmentId: string, now: Date) {
+    const outcome = UUID.test(appointmentId) ? await this.prisma.outcome.findUnique({ where: { appointmentId } }) : null;
+    if (!outcome) throw httpError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'No result has been recorded for this appointment.');
+    if (outcome.code !== 'NEW_PRESCRIPTION') {
+      throw httpError(HttpStatus.CONFLICT, 'NO_NEW_GLASSES', 'Only a new prescription has glasses to collect.');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      // Conditional, so two clicks (or two staff) mark it, and audit it, only once.
+      const { count } = await tx.outcome.updateMany({
+        where: { appointmentId, glassesReadyAt: null },
+        data: { glassesReadyAt: now },
+      });
+      if (count === 0) throw httpError(HttpStatus.CONFLICT, 'ALREADY_MARKED', 'These glasses are already marked as ready.');
+      await this.audit.record(
+        { actor: staff, action: 'GLASSES_READY', entityType: 'Appointment', entityId: appointmentId },
+        tx,
+      );
+      return tx.outcome.findUniqueOrThrow({ where: { appointmentId } });
+    });
+  }
+
   /** The patient's most recent outcome, by appointment date. */
   latestFor(patientId: string) {
     return this.prisma.outcome.findFirst({

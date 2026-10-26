@@ -281,6 +281,7 @@ model Appointment {
 enum NotificationType {
   APPOINTMENT_REMINDER
   ANNUAL_CHECKUP
+  GLASSES_READY
 }
 
 /// One email the clinic sends on its own (not login codes). The row is written BEFORE
@@ -291,7 +292,8 @@ model Notification {
   id            String           @id @default(uuid()) @db.Uuid
   type          NotificationType
   /// What makes it "the same email": an appointment and its start time for a reminder
-  /// (moving it earns a new one), the visit it follows for the yearly check-up.
+  /// (moving it earns a new one), the visit it follows for the yearly check-up, the
+  /// outcome for glasses ready.
   dedupeKey     String           @map("dedupe_key")
   patientId     String           @map("patient_id") @db.Uuid
   patient       Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
@@ -327,6 +329,9 @@ model Outcome {
   recordedAt        DateTime    @map("recorded_at") @db.Timestamptz(3)
   /// Set when the doctor corrects it; the patient sees an "edited" tag.
   correctedAt       DateTime?   @map("corrected_at") @db.Timestamptz(3)
+  /// Staff marked the glasses for a NEW_PRESCRIPTION as ready to collect. Never unset:
+  /// the patient may already have been emailed. Who did it is in the audit log.
+  glassesReadyAt    DateTime?   @map("glasses_ready_at") @db.Timestamptz(3)
   offersShown       OfferShown[]
 
   @@map("outcomes")

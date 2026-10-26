@@ -53,6 +53,8 @@ export type Result =
       recordedAt: string;
       edited: boolean;
       editedAt: string | null;
+      /** Only for a new prescription: when its glasses were ready to collect. */
+      glassesReadyAt: string | null;
     };
 
 /** Shown next to the agent's reply, straight from a tool: never written by the model. */

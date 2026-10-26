@@ -175,3 +175,46 @@ describe('yearly check-up reminder', () => {
     expect(inbox.sent).toEqual([]);
   });
 });
+
+describe('glasses ready', () => {
+  /** A completed exam for this patient with a NEW_PRESCRIPTION outcome, glasses marked ready. */
+  async function glassesReady(patient: 'two' | 'demo' = 'two', time = '10:00') {
+    const exam = await followUp(time, patient);
+    await prisma.appointment.update({ where: { id: exam.id }, data: { status: 'COMPLETED' } });
+    await prisma.outcome.create({
+      data: {
+        appointmentId: exam.id,
+        code: 'NEW_PRESCRIPTION',
+        patientNote: 'Your new glasses will make reading easier.',
+        recordedByStaffId: clinic.staff.drAyesha.id,
+        recordedAt: local(MON, '10:20'),
+        glassesReadyAt: local('2026-11-02', '12:00'),
+      },
+    });
+    return exam;
+  }
+
+  it('G3. one email once the glasses are marked; nothing clinical, no second email', async () => {
+    const exam = await glassesReady();
+
+    await notifications.runOnce(local('2026-11-02', '12:01'));
+    await notifications.runOnce(local('2026-11-02', '12:02'));
+
+    expect(inbox.sent.map((e) => e.subject)).toEqual(['Your glasses are ready to collect']);
+    expect(inbox.sent[0].text).toContain('Your new glasses are ready to collect from Demo Eye Clinic.');
+    expect(inbox.sent[0].text).toContain(exam.reference);
+    expect(inbox.sent[0].text).not.toMatch(/prescription|reading easier|NEW_PRESCRIPTION/i);
+  });
+
+  it('G3b. never for the demo patient; and a failed send is retried', async () => {
+    await glassesReady('demo');
+    await notifications.runOnce(local('2026-11-02', '12:01'));
+    expect(inbox.sent).toEqual([]);
+
+    await glassesReady('two', '11:00');
+    inbox.down = true;
+    expect(await notifications.runOnce(local('2026-11-02', '12:01'))).toEqual({ sent: 0, failed: 1 });
+    inbox.down = false;
+    expect(await notifications.runOnce(local('2026-11-02', '12:02'))).toEqual({ sent: 1, failed: 0 });
+  });
+});

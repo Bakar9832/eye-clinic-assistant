@@ -115,7 +115,8 @@ export const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
   get_my_appointments: "The logged-in patient's appointments, with references and status.",
   get_my_outcome:
     "The logged-in patient's latest result. Needs their date of birth confirmed in the secure box on the page " +
-    '(never in the chat). The doctor\'s note is shown to the patient directly; never repeat, summarise or interpret it.',
+    '(never in the chat). The doctor\'s note is shown to the patient directly; never repeat, summarise or interpret it. ' +
+    'For a new prescription it also says whether the glasses are ready to collect.',
   get_offers:
     "Offers that fit the logged-in patient's latest result, each shown only once. Needs the date-of-birth check. " +
     'Mention an offer once, briefly; never push it.',
@@ -354,6 +355,10 @@ export class ClinicToolsService {
         recorded_on: result.recordedAt.slice(0, 10),
         doctor: result.doctorName,
         edited: result.edited,
+        // Answers "are my glasses ready?". Only a new prescription has glasses.
+        ...(result.outcome === 'NEW_PRESCRIPTION'
+          ? { glasses_ready: result.glassesReadyAt !== null, glasses_ready_on: result.glassesReadyAt?.slice(0, 10) ?? null }
+          : {}),
         note: "Shown to the patient in a card from the doctor. Don't repeat, summarise or interpret it.",
       },
       cards: [
