@@ -28,6 +28,8 @@ import { MyResultsController } from './me/my-results.controller.js';
 import { EmailSender, emailSenderFromEnv } from './notifications/email-sender.js';
 import { NotificationsService } from './notifications/notifications.service.js';
 import { NotificationsWorker } from './notifications/notifications.worker.js';
+import { RetentionService } from './retention/retention.service.js';
+import { RetentionWorker } from './retention/retention.worker.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { SchedulingErrorFilter } from './scheduling-error.filter.js';
 import { OutcomesService } from './outcomes/outcomes.service.js';
@@ -68,6 +70,8 @@ import { StaffGuard } from './staff/staff.guard.js';
     StaffGuard,
     NotificationsService,
     NotificationsWorker,
+    RetentionService,
+    RetentionWorker,
     // Swapped for fakes in tests.
     { provide: Clock, useClass: SystemClock },
     { provide: EmailSender, useFactory: () => emailSenderFromEnv() },

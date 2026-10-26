@@ -18,8 +18,9 @@ import { testPrisma } from '../src/testing-db.js';
 
 export const ZONE = 'Asia/Karachi';
 
-// No background email runs during tests: they call NotificationsService.runOnce themselves.
+// No background jobs during tests: they call runOnce themselves.
 process.env.NOTIFICATIONS_EVERY_SECONDS = '0';
+process.env.RETENTION_EVERY_HOURS = '0';
 
 export class FakeClock extends Clock {
   constructor(private current: Date) {

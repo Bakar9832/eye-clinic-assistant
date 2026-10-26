@@ -53,6 +53,9 @@ model ClinicSetting {
   reminderHoursBefore Int @default(24) @map("reminder_hours_before")
   /// The yearly check-up email goes out this many months after the last annual-type visit.
   annualReminderMonths Int @default(11) @map("annual_reminder_months")
+  /// Chats are deleted this many days after their last message; closed handoffs this
+  /// many days after they were created. The daily cleanup (RetentionService) applies it.
+  chatRetentionDays Int @default(30) @map("chat_retention_days")
 
   @@map("clinic_settings")
 }
@@ -386,7 +389,8 @@ model HandoffRequest {
 }
 
 /// A chat with the agent. Owned by a logged-in patient, or by an anonymous visitor's
-/// browser (a random key in a cookie; only its hash is stored). Kept 30 days.
+/// browser (a random key in a cookie; only its hash is stored). Deleted, with its
+/// messages, ClinicSetting.chatRetentionDays after the last message.
 model Conversation {
   id            String           @id @default(uuid()) @db.Uuid
   patientId     String?          @map("patient_id") @db.Uuid

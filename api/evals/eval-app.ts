@@ -69,8 +69,9 @@ export interface EvalApp {
 }
 
 export async function createEvalApp(options: { databaseUrl: string; agent: AgentClient; port?: number }): Promise<EvalApp> {
-  // No reminder emails while evals run: the cases are about the chat.
+  // No background jobs while evals run: the cases are about the chat.
   process.env.NOTIFICATIONS_EVERY_SECONDS = '0';
+  process.env.RETENTION_EVERY_HOURS = '0';
   const prisma = createPrismaClient(options.databaseUrl);
   const clock = new FakeClock(EVAL_NOW);
   const inbox = new FakeInbox();
