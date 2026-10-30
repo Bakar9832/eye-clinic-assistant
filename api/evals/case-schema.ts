@@ -20,6 +20,7 @@ export const PATIENTS = ['demo', 'two', 'three'] as const;
 const TOOLS = [
   'list_appointment_types',
   'check_availability',
+  'propose_booking',
   'book',
   'reschedule',
   'cancel',
@@ -28,7 +29,7 @@ const TOOLS = [
   'get_offers',
   'handoff_to_staff',
 ] as const;
-const CARD_TYPES = ['doctor_note', 'dob_prompt', 'ticket'] as const;
+const CARD_TYPES = ['doctor_note', 'dob_prompt', 'ticket', 'booking_offer'] as const;
 
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const TIME = z.string().regex(/^\d{2}:\d{2}$/);

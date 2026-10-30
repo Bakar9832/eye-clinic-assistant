@@ -150,3 +150,75 @@ describe('the whole chain, with a scripted agent instead of an LLM', () => {
     expect(await t.prisma.auditEvent.count({ where: { entityId: saved.id, action: 'APPOINTMENT_BOOKED', actorId: clinic.patients.demo.id } })).toBe(1);
   });
 });
+
+describe('C. Confirm on a booking offer: the click books, not the model', () => {
+  type Offer = Extract<Card, { type: 'booking_offer' }>;
+
+  /** "Can I book…?" with a scripted agent calling propose_booking: the card the page shows. */
+  async function offerFor(browser: Awaited<ReturnType<typeof login>>) {
+    t.agent.respond = async (turn) => {
+      const client = await mcpClient(t, turn.agentToken);
+      const result = await client.callTool({
+        name: 'propose_booking',
+        arguments: { type: 'FOLLOW_UP', date: '2030-01-07', time: '10:00', doctor: 'Dr Ayesha' },
+      });
+      return { reply: '10:00 is free. Would you like to confirm it?', cards: ((result as { _meta?: { cards?: Card[] } })._meta?.cards ?? []) as Card[] };
+    };
+    const res = await browser.post('/chat').send({ message: 'Can I book a follow-up Monday at 10?' }).expect(200);
+    const offer = (res.body.cards as Card[]).find((c): c is Offer => c.type === 'booking_offer')!;
+    return { conversationId: res.body.conversationId as string, offer, confirm: { typeCode: offer.typeCode, start: offer.start, doctorId: offer.doctorId } };
+  }
+
+  it('C1. the offer books nothing; Confirm books exactly one, and the conversation records both sides', async () => {
+    const browser = await login(t, DEMO);
+    const { conversationId, offer, confirm } = await offerFor(browser);
+    expect(offer).toMatchObject({ typeCode: 'FOLLOW_UP', typeName: expect.any(String), doctor: 'Dr Ayesha' });
+    expect(await t.prisma.appointment.count()).toBe(0);
+
+    const res = await browser.post(`/chat/${conversationId}/book`).send(confirm).expect(200);
+
+    const saved = await t.prisma.appointment.findFirstOrThrow();
+    expect(saved).toMatchObject({ patientId: clinic.patients.demo.id, startsAt: new Date(offer.start) });
+    expect(res.body.reply).toContain(saved.reference);
+    expect(res.body.cards).toEqual([expect.objectContaining({ type: 'ticket', reference: saved.reference })]);
+    // No model call: the click is the consent.
+    expect(t.agent.turns).toHaveLength(1);
+
+    const history = (await browser.get(`/chat/${conversationId}`).expect(200)).body as { role: string; text: string }[];
+    expect(history.slice(-2).map((m) => m.role)).toEqual(['user', 'assistant']);
+    expect(history.at(-2)!.text).toBe('Yes, please book it.');
+  });
+
+  it('C2. pressing Confirm twice books once; the second gets the reason', async () => {
+    const browser = await login(t, DEMO);
+    const { conversationId, confirm } = await offerFor(browser);
+    await browser.post(`/chat/${conversationId}/book`).send(confirm).expect(200);
+
+    const again = await browser.post(`/chat/${conversationId}/book`).send(confirm);
+    expect(again.status).toBe(409);
+    expect(await t.prisma.appointment.count()).toBe(1);
+  });
+
+  it('C3. a time taken since the offer is refused with a clear reason', async () => {
+    const browser = await login(t, DEMO);
+    const { conversationId, confirm } = await offerFor(browser);
+    const two = await login(t, 'test.two@example.com');
+    await two.post('/me/appointments').send(confirm).expect(201);
+
+    const res = await browser.post(`/chat/${conversationId}/book`).send(confirm);
+    // The calendar's check: the time is no longer a free slot.
+    expect(res.status).toBe(422);
+    expect(res.body.error).toBe('INVALID_SLOT');
+    expect(await t.prisma.appointment.count({ where: { patientId: clinic.patients.demo.id } })).toBe(0);
+  });
+
+  it("C4. only the conversation's own logged-in patient can confirm in it", async () => {
+    const browser = await login(t, DEMO);
+    const { conversationId, confirm } = await offerFor(browser);
+
+    await t.browser().post(`/chat/${conversationId}/book`).send(confirm).expect(401);
+    const two = await login(t, 'test.two@example.com');
+    await two.post(`/chat/${conversationId}/book`).send(confirm).expect(404);
+    expect(await t.prisma.appointment.count()).toBe(0);
+  });
+});

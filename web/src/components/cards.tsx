@@ -104,8 +104,49 @@ export function DobCard({ onVerified }: { onVerified: () => void }) {
   );
 }
 
+export type Offer = Extract<Card, { type: 'booking_offer' }>;
+
+/**
+ * A free time the patient asked about. The model wrote the question above it; these
+ * buttons are the answer. Only the newest offer can be used, so an old one can't book
+ * by accident.
+ */
+export function BookingOfferCard({ card, actions }: { card: Offer; actions: OfferActions }) {
+  return (
+    <section aria-label="Booking offer" className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm">
+      <p className="font-medium text-brand-800">{card.typeName}</p>
+      <p className="mt-1">
+        <TimeText iso={card.start} />
+        {card.doctor && <span> with {card.doctor}</span>}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          disabled={!actions.active}
+          onClick={() => actions.onConfirm(card)}
+          className="rounded bg-brand-600 px-3 py-1.5 text-white disabled:opacity-50"
+        >
+          Confirm
+        </button>
+        <button
+          disabled={!actions.active}
+          onClick={actions.onOtherTime}
+          className="rounded border border-slate-300 px-3 py-1.5 text-slate-700 disabled:opacity-50"
+        >
+          Choose another time
+        </button>
+      </div>
+    </section>
+  );
+}
+
+export interface OfferActions {
+  active: boolean;
+  onConfirm: (card: Offer) => void;
+  onOtherTime: () => void;
+}
+
 /** Renders whichever card a tool produced. */
-export function CardView({ card, onDobVerified }: { card: Card; onDobVerified: () => void }) {
+export function CardView({ card, onDobVerified, offer }: { card: Card; onDobVerified: () => void; offer?: OfferActions }) {
   switch (card.type) {
     case 'doctor_note':
       return <DoctorNoteCard card={card} />;
@@ -113,5 +154,7 @@ export function CardView({ card, onDobVerified }: { card: Card; onDobVerified: (
       return <TicketCard card={card} />;
     case 'dob_prompt':
       return <DobCard onVerified={onDobVerified} />;
+    case 'booking_offer':
+      return <BookingOfferCard card={card} actions={offer ?? { active: false, onConfirm: () => {}, onOtherTime: () => {} }} />;
   }
 }

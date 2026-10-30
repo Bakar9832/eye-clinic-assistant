@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DEMO, mockApi, renderApp } from '../test/render';
-import { DOB_CONFIRMED_MESSAGE } from './ChatPage';
+import { DOB_CONFIRMED_MESSAGE, OTHER_TIME_MESSAGE } from './ChatPage';
 
 async function say(text: string) {
   await userEvent.type(screen.getByLabelText('Message'), text);
@@ -91,5 +91,73 @@ describe('the chat', () => {
     const note = screen.getByText('Chatting as a guest:').closest('p')!;
     expect(note).toHaveTextContent('Chatting as a guest: ask about appointments and when doctors are free. Log in to book or see your results.');
     expect(within(note).getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login');
+  });
+
+  describe('a booking offer: the patient answers with a button', () => {
+    const OFFER = {
+      type: 'booking_offer',
+      typeCode: 'FOLLOW_UP',
+      typeName: 'Follow-up',
+      start: '2030-01-07T05:00:00Z',
+      doctorId: 'doc-1',
+      doctor: 'Dr Ayesha',
+    };
+    const offered = { body: { conversationId: 'conv-1', reply: 'Yes, 10:00 is free. Shall I confirm it, or would you like another time?', cards: [OFFER] } };
+
+    it('W-O1. Confirm books through the API, not the chat, and shows the ticket', async () => {
+      const api = mockApi({
+        'GET /me': { body: DEMO },
+        'POST /chat': offered,
+        'POST /chat/conv-1/book': {
+          body: {
+            conversationId: 'conv-1',
+            reply: 'Booked: Follow-up, Monday 7 January, 10:00 clinic time with Dr Ayesha. Your reference is EC-ABC123.',
+            cards: [{ type: 'ticket', reference: 'EC-ABC123', start: OFFER.start, doctor: 'Dr Ayesha', prepInstructions: 'Bring your glasses.' }],
+          },
+        },
+      });
+      renderApp('/');
+
+      await say('Can I book a follow-up Monday at 10?');
+      const card = await screen.findByRole('region', { name: 'Booking offer' });
+      await userEvent.click(within(card).getByRole('button', { name: 'Confirm' }));
+
+      expect(await screen.findByRole('region', { name: 'Booking ticket' })).toHaveTextContent('EC-ABC123');
+      const book = api.calls.find((c) => c.path === '/chat/conv-1/book');
+      expect(book?.body).toEqual({ typeCode: 'FOLLOW_UP', start: OFFER.start, doctorId: 'doc-1' });
+      expect(api.calls.filter((c) => c.path === '/chat')).toHaveLength(1);
+      // The used offer can't be pressed again.
+      expect(within(card).getByRole('button', { name: 'Confirm' })).toBeDisabled();
+    });
+
+    it('W-O2. "Choose another time" carries on the conversation and books nothing', async () => {
+      const api = mockApi({
+        'GET /me': { body: DEMO },
+        'POST /chat': (call) =>
+          call.body?.message === OTHER_TIME_MESSAGE ? { body: { conversationId: 'conv-1', reply: 'Which day suits you?', cards: [] } } : offered,
+      });
+      renderApp('/');
+
+      await say('Can I book a follow-up Monday at 10?');
+      const card = await screen.findByRole('region', { name: 'Booking offer' });
+      await userEvent.click(within(card).getByRole('button', { name: 'Choose another time' }));
+
+      expect(await screen.findByText('Which day suits you?')).toBeInTheDocument();
+      expect(api.calls.some((c) => c.path.endsWith('/book'))).toBe(false);
+    });
+
+    it('W-O3. a taken time since the offer shows the reason', async () => {
+      mockApi({
+        'GET /me': { body: DEMO },
+        'POST /chat': offered,
+        'POST /chat/conv-1/book': { status: 422, body: { error: 'INVALID_SLOT', reasons: [{ code: 'NOT_FREE', message: 'That time is no longer free.' }] } },
+      });
+      renderApp('/');
+
+      await say('Can I book a follow-up Monday at 10?');
+      await userEvent.click(within(await screen.findByRole('region', { name: 'Booking offer' })).getByRole('button', { name: 'Confirm' }));
+
+      expect(await screen.findByRole('alert')).toBeInTheDocument();
+    });
   });
 });

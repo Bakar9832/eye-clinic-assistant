@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { api, ApiError, errorText } from '../api/client';
 import type { Card, ChatReply } from '../api/types';
 import { useApp } from '../app-context';
-import { CardView } from '../components/cards';
+import { CardView, type Offer } from '../components/cards';
 
 interface Bubble {
   role: 'user' | 'assistant' | 'error';
@@ -13,6 +13,8 @@ interface Bubble {
 
 /** Sent after the secure box confirms the date of birth. The date itself never enters the chat. */
 export const DOB_CONFIRMED_MESSAGE = "I've confirmed my date of birth.";
+/** What "Choose another time" says for the patient. */
+export const OTHER_TIME_MESSAGE = "I'd like a different time, please.";
 
 const GREETING =
   "Hi! I can check free times, book, move or cancel appointments, and tell you when your results are in. What can I do for you?";
@@ -63,6 +65,24 @@ export function ChatPage() {
     }
   }
 
+  /** Confirm on an offer books it directly: the click is the patient's consent, not the model's guess. */
+  async function confirmBooking(offer: Offer) {
+    if (busy || !conversationId) return;
+    setBubbles((b) => [...b, { role: 'user', text: 'Yes, please book it.' }]);
+    setBusy(true);
+    try {
+      const reply = await api<ChatReply>(`/chat/${conversationId}/book`, {
+        method: 'POST',
+        body: { typeCode: offer.typeCode, start: offer.start, ...(offer.doctorId ? { doctorId: offer.doctorId } : {}) },
+      });
+      setBubbles((b) => [...b, { role: 'assistant', text: reply.reply, cards: reply.cards }]);
+    } catch (err) {
+      setBubbles((b) => [...b, { role: 'error', text: errorText(err) }]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function submit(e: FormEvent) {
     e.preventDefault();
     const text = input;
@@ -89,7 +109,15 @@ export function ChatPage() {
             <Message role={bubble.role} text={bubble.text} />
             {bubble.cards?.map((card, j) => (
               <div key={j} className="ml-0 max-w-xl sm:ml-8">
-                <CardView card={card} onDobVerified={() => void send(DOB_CONFIRMED_MESSAGE)} />
+                <CardView
+                  card={card}
+                  onDobVerified={() => void send(DOB_CONFIRMED_MESSAGE)}
+                  offer={{
+                    active: i === bubbles.length - 1 && !busy,
+                    onConfirm: (offer) => void confirmBooking(offer),
+                    onOtherTime: () => void send(OTHER_TIME_MESSAGE),
+                  }}
+                />
               </div>
             ))}
           </div>

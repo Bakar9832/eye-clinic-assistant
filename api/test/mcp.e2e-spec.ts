@@ -62,7 +62,7 @@ describe('T1. the agent token', () => {
     await expect(mcpClient(t, tampered)).rejects.toThrow();
 
     const client = await mcpClient(t, token);
-    expect((await client.listTools()).tools.length).toBe(9);
+    expect((await client.listTools()).tools.length).toBe(10);
 
     t.clock.advanceMinutes(6);
     await expect(mcpClient(t, token)).rejects.toThrow();
@@ -80,7 +80,7 @@ describe('T1. the agent token', () => {
 });
 
 describe('T3. no tool can be told whose data to use', () => {
-  it('none of the 9 tools has an identity field, and none accepts unknown fields', async () => {
+  it('none of the tools has an identity field, and none accepts unknown fields', async () => {
     const client = await mcpClient(t, await agentTokenFor(t, t.browser()));
     const { tools } = await client.listTools();
 
@@ -94,6 +94,7 @@ describe('T3. no tool can be told whose data to use', () => {
         'get_offers',
         'handoff_to_staff',
         'list_appointment_types',
+        'propose_booking',
         'reschedule',
       ].sort(),
     );
@@ -220,6 +221,52 @@ describe('booking through the agent', () => {
     const result = await call(client, 'book', { type: 'FOLLOW_UP', date: MON, time: '10:07' });
     expect(result.isError).toBe(true);
     expect(toolData(result)).toMatchObject({ error: 'INVALID_SLOT', reasons: [{ code: 'NOT_ON_GRID' }] });
+  });
+});
+
+describe('P. propose_booking: a question about one time books nothing', () => {
+  const ask = (client: Client, time: string) =>
+    call(client, 'propose_booking', { type: 'FOLLOW_UP', date: MON, time, doctor: 'Dr Ayesha' });
+
+  it('P1. a free time: FREE, and a Confirm card with what to book; nothing is booked', async () => {
+    const { client } = await asPatient();
+    const result = await ask(client, '10:00');
+
+    expect(result.isError).toBe(false);
+    expect(toolData(result)).toMatchObject({ status: 'FREE', date: MON, clinic_time: '10:00', doctor: 'Dr Ayesha' });
+    expect(cardsOf(result)).toEqual([
+      {
+        type: 'booking_offer',
+        typeCode: 'FOLLOW_UP',
+        typeName: expect.any(String),
+        start: DateTime.fromISO(`${MON}T10:00`, { zone: ZONE }).toUTC().toISO(),
+        doctorId: clinic.resources.ayesha.id,
+        doctor: 'Dr Ayesha',
+      },
+    ]);
+    expect(await t.prisma.appointment.count()).toBe(0);
+  });
+
+  it('P2. a taken time: NOT_FREE with the closest free times, and no card', async () => {
+    const two = await asPatient('test.two@example.com');
+    await call(two.client, 'book', { type: 'FOLLOW_UP', date: MON, time: '10:00' });
+
+    const { client } = await asPatient();
+    const result = await ask(client, '10:00');
+
+    const data = toolData(result) as { status: string; closest_free: { clinic_time: string }[] };
+    expect(data.status).toBe('NOT_FREE');
+    expect(data.closest_free.map((s) => s.clinic_time)).toEqual(['09:30', '09:45', '10:15', '10:30']);
+    expect(cardsOf(result)).toEqual([]);
+  });
+
+  it('P3. a guest hears that it is free, but gets no Confirm card (booking needs a login)', async () => {
+    const client = await mcpClient(t, await agentTokenFor(t, t.browser()));
+    const result = await ask(client, '10:00');
+
+    expect(toolData(result)).toMatchObject({ status: 'FREE', clinic_time: '10:00' });
+    expect(cardsOf(result)).toEqual([]);
+    expect(await t.prisma.appointment.count()).toBe(0);
   });
 });
 

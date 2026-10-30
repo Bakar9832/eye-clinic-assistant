@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { AgentIdentity } from '../agent/agent-token.service.js';
 import { AuditService, type Actor } from '../audit/audit.service.js';
 import { AvailabilityService } from '../availability/availability.service.js';
+import type { Slot } from '../availability/types.js';
 import { BookingService } from '../booking/booking.service.js';
 import { Clock } from '../clock.js';
 import { PrismaClient } from '../generated/prisma/client.js';
@@ -15,7 +16,10 @@ import { SchedulingError } from '../scheduling-error.js';
 export type Card =
   | { type: 'doctor_note'; note: string; doctorName: string; recordedAt: string; edited: boolean; editedAt: string | null }
   | { type: 'dob_prompt' }
-  | { type: 'ticket'; reference: string; start: string; doctor: string | null; prepInstructions: string };
+  | { type: 'ticket'; reference: string; start: string; doctor: string | null; prepInstructions: string }
+  // A free time the patient asked about. Its Confirm button books it from the page, so a
+  // question is never turned into a booking by the model.
+  | { type: 'booking_offer'; typeCode: string; typeName: string; start: string; doctorId: string | null; doctor: string | null };
 
 /** What a tool returns: `data` goes to the model, `cards` go to the page. */
 export interface ToolResult {
@@ -63,6 +67,7 @@ export const TOOL_INPUTS = {
         '(requested_time_free) and lists the free times closest to it.',
     ),
   }),
+  propose_booking: z.strictObject({ type: TYPE, date: DATE, time: TIME, doctor: DOCTOR.optional() }),
   book: z.strictObject({ type: TYPE, date: DATE, time: TIME, doctor: DOCTOR.optional() }),
   reschedule: z.strictObject({
     reference: REFERENCE,
@@ -96,6 +101,7 @@ export function toolInputs(types: { code: string; name: string }[]) {
   return {
     ...TOOL_INPUTS,
     check_availability: TOOL_INPUTS.check_availability.extend({ type }),
+    propose_booking: TOOL_INPUTS.propose_booking.extend({ type }),
     book: TOOL_INPUTS.book.extend({ type }),
   };
 }
@@ -105,6 +111,9 @@ export const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     'Appointment types (code, name, how long the patient should expect, preparation) and which doctors do each.',
   check_availability:
     'Free start times for an appointment type, by clinic day. Times are clinic time (with the viewer\'s time if different). No login needed.',
+  propose_booking:
+    'For a QUESTION about one exact time ("Can I book 2pm?", "Is 2pm free?"). Checks that time without booking it. ' +
+    'If it is free, the page shows the patient a Confirm button; if not, it returns the closest free times. Never books.',
   book:
     'Book an appointment for the logged-in patient. Checks the time itself and refuses, with the reason, if it is ' +
     'not free, so there is no need to call check_availability first. Returns the ticket.',
@@ -195,6 +204,8 @@ export class ClinicToolsService {
         return this.listTypes();
       case 'check_availability':
         return this.checkAvailability(args, who);
+      case 'propose_booking':
+        return this.proposeBooking(args, who);
       case 'book':
         return this.book(args, who);
       case 'reschedule':
@@ -272,14 +283,61 @@ export class ClinicToolsService {
         date: day.toISODate(),
         weekday: day.toFormat('cccc'),
         ...(args.near ? { requested_time_free: matching.some((s) => clinicTime(s.start) === args.near) } : {}),
-        slots: shown.map((s) => {
-          const exam = s.assignments.find((a) => names.get(a.resourceId)?.kind === 'OPTOMETRIST');
-          return { ...this.times(s.start, timezone, who.viewerTimezone), doctor: exam ? names.get(exam.resourceId)!.displayName : null };
-        }),
+        slots: shown.map((s) => ({ ...this.times(s.start, timezone, who.viewerTimezone), doctor: examDoctor(s, names)?.displayName ?? null })),
         more: matching.length - shown.length,
       });
     }
     return { data: { clinic_timezone: timezone, viewer_timezone: who.viewerTimezone, days } };
+  }
+
+  /**
+   * "Can I book 2pm?" A question, so nothing is booked: the patient confirms with the
+   * card's button (or by saying so, and the model then calls book). Gemini read such
+   * questions as instructions and booked; with this tool there is one that fits them.
+   */
+  private async proposeBooking(args: Record<string, string | undefined>, who: AgentIdentity): Promise<ToolResult> {
+    const { timezone } = await this.settings();
+    const start = await this.clinicTime(args.date!, args.time!);
+    const doctorId = args.doctor ? await this.doctorId(args.doctor) : undefined;
+    const { type, slots, names } = await this.availability.getSlots({ typeCode: args.type!, day: args.date!, doctorId, now: this.clock.now() });
+    const clinicTime = (at: Date) => DateTime.fromJSDate(at, { zone: timezone }).toFormat('HH:mm');
+
+    const slot = slots.find((s) => s.start.getTime() === start.getTime());
+    if (!slot) {
+      return {
+        data: {
+          status: 'NOT_FREE',
+          closest_free: closestTo(args.time!, slots, clinicTime).map((s) => ({
+            ...this.times(s.start, timezone, who.viewerTimezone),
+            doctor: examDoctor(s, names)?.displayName ?? null,
+          })),
+        },
+      };
+    }
+
+    const doctor = examDoctor(slot, names);
+    const free = { status: 'FREE', type: type.name, ...this.times(start, timezone, who.viewerTimezone), doctor: doctor?.displayName ?? null };
+    if (!who.patientId) {
+      return { data: { ...free, instruction: 'Say the time is free. To book it, the visitor first logs in on the page.' } };
+    }
+    return {
+      data: {
+        ...free,
+        instruction:
+          'Under your reply the page shows Confirm and "Choose another time" buttons. Say the time is free and ask ' +
+          'whether they would like to confirm it or pick another time. Do not call book unless they then ask you to.',
+      },
+      cards: [
+        {
+          type: 'booking_offer',
+          typeCode: type.code,
+          typeName: type.name,
+          start: start.toISOString(),
+          doctorId: doctor?.id ?? null,
+          doctor: doctor?.displayName ?? null,
+        },
+      ],
+    };
   }
 
   private async handoff(args: Record<string, string | undefined>, who: AgentIdentity): Promise<ToolResult> {
@@ -469,6 +527,12 @@ function dobRequired(): ToolResult {
     },
     cards: [{ type: 'dob_prompt' }],
   };
+}
+
+/** The doctor who does a free slot's exam step, if it has one. */
+function examDoctor(slot: Slot, names: Map<string, { displayName: string; kind: string }>) {
+  const exam = slot.assignments.find((a) => names.get(a.resourceId)?.kind === 'OPTOMETRIST');
+  return exam ? { id: exam.resourceId, displayName: names.get(exam.resourceId)!.displayName } : null;
 }
 
 /** The doctor for the appointment's current time (older holds remain from reschedules). */

@@ -1,12 +1,24 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Logger, Param, Post, Req, Res } from '@nestjs/common';
-import { IsOptional, IsString, IsUUID, Length, Validate, ValidatorConstraint, type ValidatorConstraintInterface } from 'class-validator';
+import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Logger, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  IsISO8601,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Length,
+  Matches,
+  Validate,
+  ValidatorConstraint,
+  type ValidatorConstraintInterface,
+} from 'class-validator';
 import type { Request, Response } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
 import { DateTime, IANAZone } from 'luxon';
 import { AgentTokenService } from '../agent/agent-token.service.js';
 import { AuthService } from '../auth/auth.service.js';
-import { SESSION_COOKIE } from '../auth/session.guard.js';
+import { CurrentPatient, SESSION_COOKIE, SessionGuard, type PatientActor } from '../auth/session.guard.js';
+import { BookingService } from '../booking/booking.service.js';
 import { Clock } from '../clock.js';
+import { doctorOf } from '../mcp/clinic-tools.service.js';
 import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
 import { AgentClient } from './agent-client.js';
@@ -44,6 +56,22 @@ class ChatDto {
   viewerTimezone?: string;
 }
 
+class ConfirmDto {
+  @Matches(/^[A-Z_]{1,50}$/, { message: 'typeCode must look like ROUTINE_EYE_TEST' })
+  typeCode!: string;
+
+  @IsISO8601({ strict: true })
+  @Matches(/(Z|[+-]\d{2}:\d{2})$/, { message: 'start must include a time zone' })
+  start!: string;
+
+  @IsOptional()
+  @IsUUID()
+  doctorId?: string;
+}
+
+/** What the conversation records for a click on Confirm. */
+export const CONFIRM_MESSAGE = 'Yes, please book it.';
+
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 
 /**
@@ -60,6 +88,7 @@ export class ChatController {
     private readonly auth: AuthService,
     private readonly tokens: AgentTokenService,
     private readonly agent: AgentClient,
+    private readonly booking: BookingService,
     private readonly clock: Clock,
   ) {}
 
@@ -143,6 +172,47 @@ export class ChatController {
       this.prisma.conversation.update({ where: { id: conversation.id }, data: { lastMessageAt: answeredAt } }),
     ]);
     return { conversationId: conversation.id, reply, cards: turn.cards };
+  }
+
+  /**
+   * The Confirm button on a booking offer. The patient's click is the consent, so the
+   * model isn't asked again: the booking is made from the session, like the calendar's,
+   * and both sides are written into the conversation so the agent knows on its next turn.
+   */
+  @Post(':id/book')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(SessionGuard)
+  async confirm(@Param('id') id: string, @Body() body: ConfirmDto, @CurrentPatient() me: PatientActor) {
+    const conversation = /^[0-9a-f-]{36}$/i.test(id)
+      ? await this.prisma.conversation.findFirst({ where: { id, patientId: me.id } })
+      : null;
+    if (!conversation) throw httpError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Conversation not found.');
+
+    const booked = await this.booking.book(
+      me.id,
+      { typeCode: body.typeCode, start: new Date(body.start), doctorId: body.doctorId },
+      this.clock.now(),
+      me,
+    );
+    const a = await this.prisma.appointment.findUniqueOrThrow({
+      where: { id: booked.id },
+      include: { appointmentType: true, allocations: { include: { resource: true } } },
+    });
+    const { timezone } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const doctor = doctorOf(a);
+    const when = DateTime.fromJSDate(a.startsAt, { zone: timezone }).toFormat('cccc d LLLL, HH:mm');
+    const reply = `Booked: ${a.appointmentType.name}, ${when} clinic time${doctor ? ` with ${doctor}` : ''}. Your reference is ${a.reference}.`;
+    const cards = [
+      { type: 'ticket', reference: a.reference, start: a.startsAt.toISOString(), doctor, prepInstructions: a.appointmentType.prepInstructions },
+    ];
+
+    const at = this.clock.now();
+    await this.prisma.$transaction([
+      this.prisma.chatMessage.create({ data: { conversationId: id, role: 'USER', text: CONFIRM_MESSAGE, createdAt: at } }),
+      this.prisma.chatMessage.create({ data: { conversationId: id, role: 'ASSISTANT', text: reply, cards, createdAt: at } }),
+      this.prisma.conversation.update({ where: { id }, data: { lastMessageAt: at } }),
+    ]);
+    return { conversationId: id, reply, cards };
   }
 
   @Get(':id')

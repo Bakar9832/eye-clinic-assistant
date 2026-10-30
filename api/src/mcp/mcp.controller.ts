@@ -5,7 +5,7 @@ import type { Request, Response } from 'express';
 import { AgentTokenService } from '../agent/agent-token.service.js';
 import { ClinicToolsService, TOOL_DESCRIPTIONS, TOOL_INPUTS, type ToolName } from './clinic-tools.service.js';
 
-const READ_ONLY: ToolName[] = ['list_appointment_types', 'check_availability', 'get_my_appointments', 'get_my_outcome'];
+const READ_ONLY: ToolName[] = ['list_appointment_types', 'check_availability', 'propose_booking', 'get_my_appointments', 'get_my_outcome'];
 
 /**
  * The MCP server the agent calls. Stateless: every request brings its agent token, is

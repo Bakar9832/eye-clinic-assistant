@@ -61,7 +61,8 @@ export type Result =
 export type Card =
   | { type: 'doctor_note'; note: string; doctorName: string; recordedAt: string; edited: boolean; editedAt: string | null }
   | { type: 'dob_prompt' }
-  | { type: 'ticket'; reference: string; start: string; doctor: string | null; prepInstructions: string };
+  | { type: 'ticket'; reference: string; start: string; doctor: string | null; prepInstructions: string }
+  | { type: 'booking_offer'; typeCode: string; typeName: string; start: string; doctorId: string | null; doctor: string | null };
 
 export interface ChatReply {
   conversationId: string;

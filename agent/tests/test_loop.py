@@ -167,6 +167,8 @@ async def test_the_prompt_separates_book_now_ask_first_and_offer_alternatives():
     # Qwen 3.5 9B always stopped to ask after check_availability, so an instruction goes
     # straight to book, which checks the time itself.
     assert "Call book straight away, without check_availability" in prompt
+    # Gemini 3.1 Flash-Lite booked "Can I book 2pm?" outright: a question gets its own tool.
+    assert "Call propose_booking, never book" in prompt
     assert "If requested_time_free is true, say so and ask if you should book it" in prompt
     assert "offer up to four free times, the closest to what they asked for" in prompt
     assert "call book right away without asking again" in prompt
