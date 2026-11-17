@@ -1,5 +1,5 @@
 import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../generated/prisma/client.js';
+import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
 
 /**
  * Every database connection goes through here.
@@ -9,8 +9,9 @@ import { PrismaClient } from '../generated/prisma/client.js';
  * picks up the Windows zone), every stored time silently shifts by hours.
  * Forcing the session to UTC makes storage independent of where Postgres runs.
  */
-export function createPrismaClient(connectionString: string): PrismaClient {
+export function createPrismaClient(connectionString: string, { log }: { log?: Prisma.PrismaClientOptions['log'] } = {}): PrismaClient {
   return new PrismaClient({
+    log,
     adapter: new PrismaPg({ connectionString, options: '-c timezone=UTC' }),
   });
 }
