@@ -21,13 +21,24 @@ export function formatError(formatted: GraphQLFormattedError): GraphQLFormattedE
   };
 }
 
-/** The staff dashboard's GraphQL endpoint. Under /staff, so the staff session cookie reaches it. */
-export const StaffGraphQLModule = GraphQLModule.forRoot<ApolloDriverConfig>({
-  driver: ApolloDriver,
-  path: '/staff/graphql',
-  autoSchemaFile: true,
-  sortSchema: true,
-  context: ({ req, res }: { req: Request; res: Response }) => ({ req, res }),
-  includeStacktraceInErrorResponses: false,
-  formatError,
-});
+/**
+ * The staff dashboard's GraphQL endpoint. Under /staff, so the staff session cookie
+ * reaches it; every root query and mutation is behind StaffGuard (see resolvers.ts).
+ * Read when the app starts, so tests can start one in production mode.
+ */
+export function staffGraphQLOptions(): ApolloDriverConfig {
+  const development = process.env.NODE_ENV !== 'production';
+  return {
+    path: '/staff/graphql',
+    autoSchemaFile: true,
+    sortSchema: true,
+    context: ({ req, res }: { req: Request; res: Response }) => ({ req, res }),
+    // Exploring the schema (introspection, the GraphiQL page) is for development only.
+    introspection: development,
+    graphiql: development,
+    includeStacktraceInErrorResponses: false,
+    formatError,
+  };
+}
+
+export const StaffGraphQLModule = GraphQLModule.forRootAsync<ApolloDriverConfig>({ driver: ApolloDriver, useFactory: staffGraphQLOptions });
