@@ -7,17 +7,17 @@ import { PrismaClient, type LoginPurpose } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
 import { EmailSender } from '../notifications/email-sender.js';
 
-export const CODE_TTL_MINUTES = 10;
-export const MAX_CODE_ATTEMPTS = 5;
-export const SESSION_DAYS = 7;
+const CODE_TTL_MINUTES = 10;
+const MAX_CODE_ATTEMPTS = 5;
+const SESSION_DAYS = 7;
 /** Staff sessions last one shift. */
-export const STAFF_SESSION_HOURS = 12;
-export const CODES_PER_EMAIL = { limit: 5, windowMinutes: 15 };
-export const CODES_PER_IP = { limit: 10, windowMinutes: 60 };
+const STAFF_SESSION_HOURS = 12;
+const CODES_PER_EMAIL = { limit: 5, windowMinutes: 15 };
+const CODES_PER_IP = { limit: 10, windowMinutes: 60 };
 
 const minutes = (n: number) => n * 60_000;
 
-export function normaliseEmail(email: string) {
+function normaliseEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
@@ -199,7 +199,7 @@ export class AuthService {
   }
 }
 
-export function hashToken(token: string) {
+function hashToken(token: string) {
   return createHash('sha256').update(token).digest('hex');
 }
 

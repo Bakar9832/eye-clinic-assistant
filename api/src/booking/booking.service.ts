@@ -3,6 +3,7 @@ import { DateTime } from 'luxon';
 import { AuditService, SYSTEM, type Actor } from '../audit/audit.service.js';
 import { AvailabilityService, type SlotQuery } from '../availability/availability.service.js';
 import type { Slot } from '../availability/types.js';
+import { clinicSettings } from '../clinic-settings.js';
 import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
 import { isOverlapViolation, isUniqueViolation } from '../prisma/db-errors.js';
 import { SchedulingError, type Reason } from '../scheduling-error.js';
@@ -247,7 +248,7 @@ export class BookingService {
    * requests could both pass, which costs a cancellation, not a clash.
    */
   private async refuseSameTypeSameDay(patientId: string, typeCode: string, start: Date, now: Date, ignoreId?: string) {
-    const { timezone } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const { timezone } = await clinicSettings(this.prisma);
     const day = DateTime.fromJSDate(start, { zone: timezone }).startOf('day');
     const existing = await this.prisma.appointment.findFirst({
       where: {
@@ -275,7 +276,7 @@ export class BookingService {
 
   /** The clinic-local day a start time falls on. */
   private async clinicDay(start: Date) {
-    const { timezone } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const { timezone } = await clinicSettings(this.prisma);
     return DateTime.fromJSDate(start, { zone: timezone }).toISODate()!;
   }
 

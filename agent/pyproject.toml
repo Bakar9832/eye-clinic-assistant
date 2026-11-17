@@ -10,11 +10,11 @@ dependencies = [
     "openai==3.28.0",
     "mcp==2.3.0",
     "pydantic-settings==2.15.0",
-    "httpx==0.28.1",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest==9.1.1", "pytest-asyncio==1.4.0"]
+# httpx: only the tests import it (openai and mcp bring it in at run time).
+dev = ["pytest==9.1.1", "pytest-asyncio==1.4.0", "httpx==0.28.1"]
 
 [build-system]
 requires = ["setuptools>=68"]

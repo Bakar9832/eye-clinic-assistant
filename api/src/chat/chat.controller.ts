@@ -1,45 +1,31 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Logger, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
-import {
-  IsISO8601,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Length,
-  Matches,
-  Validate,
-  ValidatorConstraint,
-  type ValidatorConstraintInterface,
-} from 'class-validator';
+import { IsOptional, IsString, IsUUID, Length, Validate } from 'class-validator';
 import type { Request, Response } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
-import { DateTime, IANAZone } from 'luxon';
+import { DateTime } from 'luxon';
 import { AgentTokenService } from '../agent/agent-token.service.js';
 import { AuthService } from '../auth/auth.service.js';
 import { CurrentPatient, SESSION_COOKIE, SessionGuard, type PatientActor } from '../auth/session.guard.js';
+import { BookDto } from '../booking/booking.dto.js';
 import { BookingService } from '../booking/booking.service.js';
+import { clinicSettings } from '../clinic-settings.js';
 import { Clock } from '../clock.js';
-import { doctorOf } from '../mcp/clinic-tools.service.js';
 import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
+import { IsTimezone } from '../http/is-timezone.js';
+import { doctorOf, ticketCard } from '../mcp/clinic-tools.service.js';
 import { AgentClient } from './agent-client.js';
 import { redactDateOfBirth } from './redact.js';
 
-export const CHAT_LIMIT = { messages: 20, windowMinutes: 10 };
-export const MAX_MESSAGE_CHARS = 1000;
+const CHAT_LIMIT = { messages: 20, windowMinutes: 10 };
+const MAX_MESSAGE_CHARS = 1000;
 /** How many earlier messages the agent sees each turn. */
 const HISTORY = 20;
 /** Anonymous visitors' browsers get a random key, so they can continue their own chat. */
 const ANON_COOKIE = 'chat_anon';
-
-@ValidatorConstraint({ name: 'timezone' })
-class IsTimezone implements ValidatorConstraintInterface {
-  validate(value: unknown) {
-    return typeof value === 'string' && IANAZone.isValidZone(value);
-  }
-  defaultMessage() {
-    return 'viewerTimezone must be an IANA zone such as Europe/London';
-  }
-}
+const CONVERSATION_ID = /^[0-9a-f-]{36}$/i;
+/** What the conversation records for a click on Confirm. */
+const CONFIRM_MESSAGE = 'Yes, please book it.';
 
 class ChatDto {
   @IsString()
@@ -55,22 +41,6 @@ class ChatDto {
   @Validate(IsTimezone)
   viewerTimezone?: string;
 }
-
-class ConfirmDto {
-  @Matches(/^[A-Z_]{1,50}$/, { message: 'typeCode must look like ROUTINE_EYE_TEST' })
-  typeCode!: string;
-
-  @IsISO8601({ strict: true })
-  @Matches(/(Z|[+-]\d{2}:\d{2})$/, { message: 'start must include a time zone' })
-  start!: string;
-
-  @IsOptional()
-  @IsUUID()
-  doctorId?: string;
-}
-
-/** What the conversation records for a click on Confirm. */
-export const CONFIRM_MESSAGE = 'Yes, please book it.';
 
 const hash = (value: string) => createHash('sha256').update(value).digest('hex');
 
@@ -128,7 +98,7 @@ export class ChatController {
       })
     ).reverse();
 
-    const settings = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const settings = await clinicSettings(this.prisma);
     const patient = owner.patientId ? await this.prisma.patient.findUnique({ where: { id: owner.patientId } }) : null;
     const viewerTimezone = body.viewerTimezone ?? patient?.timezone ?? settings.timezone;
     const today = DateTime.fromJSDate(now, { zone: settings.timezone });
@@ -182,10 +152,8 @@ export class ChatController {
   @Post(':id/book')
   @HttpCode(HttpStatus.OK)
   @UseGuards(SessionGuard)
-  async confirm(@Param('id') id: string, @Body() body: ConfirmDto, @CurrentPatient() me: PatientActor) {
-    const conversation = /^[0-9a-f-]{36}$/i.test(id)
-      ? await this.prisma.conversation.findFirst({ where: { id, patientId: me.id } })
-      : null;
+  async confirm(@Param('id') id: string, @Body() body: BookDto, @CurrentPatient() me: PatientActor) {
+    const conversation = CONVERSATION_ID.test(id) ? await this.prisma.conversation.findFirst({ where: { id, patientId: me.id } }) : null;
     if (!conversation) throw httpError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Conversation not found.');
 
     const booked = await this.booking.book(
@@ -198,13 +166,11 @@ export class ChatController {
       where: { id: booked.id },
       include: { appointmentType: true, allocations: { include: { resource: true } } },
     });
-    const { timezone } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const { timezone } = await clinicSettings(this.prisma);
     const doctor = doctorOf(a);
     const when = DateTime.fromJSDate(a.startsAt, { zone: timezone }).toFormat('cccc d LLLL, HH:mm');
     const reply = `Booked: ${a.appointmentType.name}, ${when} clinic time${doctor ? ` with ${doctor}` : ''}. Your reference is ${a.reference}.`;
-    const cards = [
-      { type: 'ticket', reference: a.reference, start: a.startsAt.toISOString(), doctor, prepInstructions: a.appointmentType.prepInstructions },
-    ];
+    const cards = [ticketCard(a)];
 
     const at = this.clock.now();
     await this.prisma.$transaction([
@@ -218,7 +184,7 @@ export class ChatController {
   @Get(':id')
   async history(@Param('id') id: string, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const owner = await this.owner(req, res);
-    const conversation = /^[0-9a-f-]{36}$/i.test(id)
+    const conversation = CONVERSATION_ID.test(id)
       ? await this.prisma.conversation.findFirst({
           where: { id, ...owner.where },
           include: { messages: { orderBy: { seq: 'asc' } } },

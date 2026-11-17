@@ -73,14 +73,17 @@ class McpToolBox:
         `async with` guarantees the clean-up runs even if the turn fails halfway.
         """
         http = create_mcp_http_client(headers={"Authorization": f"Bearer {agent_token}"})
-        async with http:
-            # terminate_on_close=False: the clinic's MCP server keeps no sessions to end.
-            async with streamable_http_client(mcp_url, http_client=http, terminate_on_close=False) as (read, write):
-                async with ClientSession(read, write) as session:
-                    await session.initialize()
-                    listed = await session.list_tools()
-                    schemas = [to_openai_tool(t.name, t.description, t.input_schema) for t in listed.tools]
-                    yield cls(session, schemas)
+        # One `async with` for all three, closed in reverse order. terminate_on_close=False:
+        # the clinic's MCP server keeps no sessions to end.
+        async with (
+            http,
+            streamable_http_client(mcp_url, http_client=http, terminate_on_close=False) as (read, write),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
+            listed = await session.list_tools()
+            schemas = [to_openai_tool(t.name, t.description, t.input_schema) for t in listed.tools]
+            yield cls(session, schemas)
 
     async def call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
         result = await self.session.call_tool(name, arguments)

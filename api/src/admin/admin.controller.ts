@@ -15,25 +15,14 @@ import {
   Min,
   Validate,
   ValidateNested,
-  ValidatorConstraint,
-  type ValidatorConstraintInterface,
 } from 'class-validator';
-import { IANAZone } from 'luxon';
+import { clinicSettings } from '../clinic-settings.js';
 import { Clock } from '../clock.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
+import { IsTimezone } from '../http/is-timezone.js';
 import { CurrentStaff, Roles, StaffGuard, type StaffActor } from '../staff/staff.guard.js';
 import { AdminService } from './admin.service.js';
-
-@ValidatorConstraint({ name: 'timezone' })
-class IsTimezone implements ValidatorConstraintInterface {
-  validate(value: unknown) {
-    return typeof value === 'string' && IANAZone.isValidZone(value);
-  }
-  defaultMessage() {
-    return 'timezone must be an IANA zone such as Asia/Karachi';
-  }
-}
 
 class SettingsDto {
   @IsOptional() @IsString() @Length(1, 100) name?: string;
@@ -121,7 +110,7 @@ export class AdminController {
   @Get('settings')
   @Roles(['ADMIN'])
   async settings() {
-    const s = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const s = await clinicSettings(this.prisma);
     return {
       name: s.name,
       timezone: s.timezone,

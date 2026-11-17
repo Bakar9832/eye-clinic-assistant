@@ -1,5 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service.js';
+import { clinicSettings } from '../clinic-settings.js';
 import { PrismaClient, type OutcomeCode } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
 import type { StaffActor } from '../staff/staff.guard.js';
@@ -63,7 +64,7 @@ export class OutcomesService {
       throw httpError(HttpStatus.FORBIDDEN, 'NOT_YOUR_OUTCOME', 'Only the doctor who recorded it can correct it.');
     }
     // Measured from the first recording, so corrections can't keep the window open.
-    const { outcomeEditWindowHours } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const { outcomeEditWindowHours } = await clinicSettings(this.prisma);
     return { outcome, outcomeEditWindowHours, editableUntil: new Date(outcome.recordedAt.getTime() + outcomeEditWindowHours * 3_600_000) };
   }
 

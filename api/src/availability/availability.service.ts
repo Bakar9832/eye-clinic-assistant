@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DateTime } from 'luxon';
+import { clinicSettings } from '../clinic-settings.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { SchedulingError, type Reason } from '../scheduling-error.js';
 import { computeSlots, slotIgnoringHours } from './compute-slots.js';
@@ -63,7 +64,7 @@ export class AvailabilityService {
   }
 
   private async loadDay({ typeCode, day, doctorId, now = new Date(), ignoreAppointmentId }: SlotQuery) {
-    const settings = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const settings = await clinicSettings(this.prisma);
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || !DateTime.fromISO(day, { zone: settings.timezone }).isValid) {
       throw new SchedulingError('INVALID_DAY', [{ code: 'INVALID_DAY', message: 'Use a date like 2026-10-26.' }]);

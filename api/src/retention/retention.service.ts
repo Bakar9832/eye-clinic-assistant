@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AuditService, SYSTEM } from '../audit/audit.service.js';
+import { clinicSettings } from '../clinic-settings.js';
 import { Clock } from '../clock.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 
@@ -30,7 +31,7 @@ export class RetentionService {
   ) {}
 
   async runOnce(now = this.clock.now()): Promise<RetentionResult> {
-    const { chatRetentionDays } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const { chatRetentionDays } = await clinicSettings(this.prisma);
     const chatCutoff = new Date(now.getTime() - chatRetentionDays * DAY);
     const dayAgo = new Date(now.getTime() - DAY);
 

@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { IsIn, IsString, Length } from 'class-validator';
 import { DateTime } from 'luxon';
+import { clinicSettings } from '../clinic-settings.js';
 import { Clock } from '../clock.js';
 import { OutcomeCode, PrismaClient } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
@@ -30,7 +31,7 @@ export class StaffClinicController {
   /** Every appointment on a clinic-local day. Patient names only: no emails, no dates of birth. */
   @Get('schedule')
   async schedule(@CurrentStaff() staff: StaffActor, @Query('day') day?: string) {
-    const { timezone } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const { timezone } = await clinicSettings(this.prisma);
     const start = DateTime.fromISO(day ?? '', { zone: timezone });
     if (!day || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !start.isValid) {
       throw httpError(HttpStatus.BAD_REQUEST, 'INVALID_DAY', 'Use a date like 2030-01-07.');

@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import { AuditService, changedFields } from '../audit/audit.service.js';
+import { clinicSettings } from '../clinic-settings.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
 import type { StaffActor } from '../staff/staff.guard.js';
@@ -186,7 +187,7 @@ export class AdminService {
 
   /** Every future booking with a step outside its resource's working hours, in clinic time. */
   async bookingsOutsideHours(now: Date): Promise<AffectedBooking[]> {
-    const { timezone } = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const { timezone } = await clinicSettings(this.prisma);
     const allocations = await this.prisma.resourceAllocation.findMany({
       where: { active: true, startsAt: { gt: now }, appointment: { status: 'BOOKED' } },
       include: {

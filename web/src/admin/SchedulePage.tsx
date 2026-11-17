@@ -6,7 +6,7 @@ import { useApp } from '../app-context';
 import { todayIn } from '../time/zones';
 import { clinicTime, OUTCOME_CODES, OUTCOME_LABELS, useStaffMe, type OutcomeCode, type OutcomeView, type ScheduleItem } from './staff-api';
 
-export const NOTE_LIMIT = 500;
+const NOTE_LIMIT = 500;
 
 /** The clinic's day, in clinic time. Doctors record outcomes for their own exams from here. */
 export function SchedulePage() {

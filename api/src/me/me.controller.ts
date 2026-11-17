@@ -1,29 +1,11 @@
 import { Body, Controller, Get, HttpStatus, Patch, UseGuards } from '@nestjs/common';
-import {
-  IsISO8601,
-  IsOptional,
-  IsString,
-  Length,
-  Validate,
-  ValidatorConstraint,
-  type ValidatorConstraintInterface,
-} from 'class-validator';
-import { IANAZone } from 'luxon';
+import { IsISO8601, IsOptional, IsString, Length, Validate } from 'class-validator';
 import { AuditService, changedFields } from '../audit/audit.service.js';
 import { CurrentPatient, SessionGuard, type PatientActor } from '../auth/session.guard.js';
 import { Clock } from '../clock.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
-
-@ValidatorConstraint({ name: 'timezone' })
-class IsTimezone implements ValidatorConstraintInterface {
-  validate(value: unknown) {
-    return typeof value === 'string' && IANAZone.isValidZone(value);
-  }
-  defaultMessage() {
-    return 'timezone must be an IANA zone such as Europe/London';
-  }
-}
+import { IsTimezone } from '../http/is-timezone.js';
 
 class UpdateProfileDto {
   @IsOptional()

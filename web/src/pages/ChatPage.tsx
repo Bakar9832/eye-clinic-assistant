@@ -40,13 +40,25 @@ export function ChatPage() {
     void end.current?.scrollIntoView({ behavior: 'smooth' });
   }, [bubbles]);
 
-  async function send(text: string) {
-    if (!text.trim() || busy) return;
+  /** Shows the patient's side at once, then the reply (or what went wrong) when it arrives. */
+  async function exchange(text: string, request: () => Promise<ChatReply>) {
     setBubbles((b) => [...b, { role: 'user', text }]);
     setBusy(true);
     try {
-      const ask = (id: string | null) =>
-        api<ChatReply>('/chat', { method: 'POST', body: { message: text, viewerTimezone: viewerZone, ...(id ? { conversationId: id } : {}) } });
+      const reply = await request();
+      setBubbles((b) => [...b, { role: 'assistant', text: reply.reply, cards: reply.cards }]);
+    } catch (err) {
+      setBubbles((b) => [...b, { role: 'error', text: errorText(err) }]);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function send(text: string) {
+    if (!text.trim() || busy) return;
+    const ask = (id: string | null) =>
+      api<ChatReply>('/chat', { method: 'POST', body: { message: text, viewerTimezone: viewerZone, ...(id ? { conversationId: id } : {}) } });
+    await exchange(text, async () => {
       let reply: ChatReply;
       try {
         reply = await ask(conversationId);
@@ -57,30 +69,19 @@ export function ChatPage() {
       }
       setConversationId(reply.conversationId);
       sessionStorage.setItem(storageKey, reply.conversationId);
-      setBubbles((b) => [...b, { role: 'assistant', text: reply.reply, cards: reply.cards }]);
-    } catch (err) {
-      setBubbles((b) => [...b, { role: 'error', text: errorText(err) }]);
-    } finally {
-      setBusy(false);
-    }
+      return reply;
+    });
   }
 
   /** Confirm on an offer books it directly: the click is the patient's consent, not the model's guess. */
   async function confirmBooking(offer: Offer) {
     if (busy || !conversationId) return;
-    setBubbles((b) => [...b, { role: 'user', text: 'Yes, please book it.' }]);
-    setBusy(true);
-    try {
-      const reply = await api<ChatReply>(`/chat/${conversationId}/book`, {
+    await exchange('Yes, please book it.', () =>
+      api<ChatReply>(`/chat/${conversationId}/book`, {
         method: 'POST',
         body: { typeCode: offer.typeCode, start: offer.start, ...(offer.doctorId ? { doctorId: offer.doctorId } : {}) },
-      });
-      setBubbles((b) => [...b, { role: 'assistant', text: reply.reply, cards: reply.cards }]);
-    } catch (err) {
-      setBubbles((b) => [...b, { role: 'error', text: errorText(err) }]);
-    } finally {
-      setBusy(false);
-    }
+      }),
+    );
   }
 
   function submit(e: FormEvent) {

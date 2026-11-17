@@ -1,29 +1,8 @@
 import { Body, Controller, HttpCode, HttpStatus, Ip, Post, Req, Res } from '@nestjs/common';
-import { Transform } from 'class-transformer';
-import { IsEmail, Matches, MaxLength } from 'class-validator';
 import type { Request, Response } from 'express';
+import { RequestCodeDto, VerifyDto } from './auth.dto.js';
 import { AuthService, type NewSession } from './auth.service.js';
 import { SESSION_COOKIE } from './session.guard.js';
-
-// Pasted emails often carry spaces; trim before the format check.
-const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
-
-class RequestCodeDto {
-  @Transform(trim)
-  @IsEmail()
-  @MaxLength(254)
-  email!: string;
-}
-
-class VerifyDto {
-  @Transform(trim)
-  @IsEmail()
-  @MaxLength(254)
-  email!: string;
-
-  @Matches(/^\d{6}$/, { message: 'code must be 6 digits' })
-  code!: string;
-}
 
 @Controller('auth')
 export class AuthController {

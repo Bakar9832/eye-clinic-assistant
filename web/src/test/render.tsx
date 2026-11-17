@@ -7,7 +7,7 @@ import { App } from '../App';
 import { AppProvider } from '../app-context';
 import type { Clinic, Profile } from '../api/types';
 
-export interface ApiCall {
+interface ApiCall {
   method: string;
   path: string;
   body: Record<string, unknown> | undefined;
@@ -16,7 +16,7 @@ export interface ApiCall {
 type Reply = { status?: number; body?: unknown };
 type Handler = Reply | ((call: ApiCall) => Reply | Promise<Reply>);
 
-export const CLINIC: Clinic = {
+const CLINIC: Clinic = {
   name: 'Demo Eye Clinic',
   timezone: 'Asia/Karachi',
   slotGridMin: 15,

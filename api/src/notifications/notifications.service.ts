@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DateTime } from 'luxon';
+import { clinicSettings } from '../clinic-settings.js';
 import { Clock } from '../clock.js';
 import { PrismaClient, type NotificationType } from '../generated/prisma/client.js';
 import { doctorOf } from '../mcp/clinic-tools.service.js';
@@ -46,7 +47,7 @@ export class NotificationsService {
     await this.prisma.notification.deleteMany({
       where: { sentAt: null, claimedAt: { lt: new Date(now.getTime() - STALE_CLAIM_MINUTES * 60_000) } },
     });
-    const settings = await this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    const settings = await clinicSettings(this.prisma);
     const due = await this.notYetClaimed([
       ...(await this.dueReminders(settings, now)),
       ...(await this.dueCheckups(settings, now)),

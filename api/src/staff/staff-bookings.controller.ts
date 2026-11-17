@@ -1,6 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, UseGuards } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsISO8601, IsOptional, IsString, IsUUID, Length, Matches, ValidateNested } from 'class-validator';
+import { IsOptional, IsString, IsUUID, Length, ValidateNested } from 'class-validator';
+import { BookDto } from '../booking/booking.dto.js';
 import { BookingService } from '../booking/booking.service.js';
 import { Clock } from '../clock.js';
 import { PrismaClient } from '../generated/prisma/client.js';
@@ -14,24 +15,13 @@ class OverrideDto {
   reason!: string;
 }
 
-class StaffBookDto {
+class StaffBookDto extends BookDto {
   /**
    * Staff say who they're booking for. Patients can never send this field; staff can,
    * because their role allows it, and every such booking is audited with their id.
    */
   @IsUUID()
   patientId!: string;
-
-  @Matches(/^[A-Z_]{1,50}$/, { message: 'typeCode must look like ROUTINE_EYE_TEST' })
-  typeCode!: string;
-
-  @IsISO8601({ strict: true })
-  @Matches(/(Z|[+-]\d{2}:\d{2})$/, { message: 'start must include a time zone' })
-  start!: string;
-
-  @IsOptional()
-  @IsUUID()
-  doctorId?: string;
 
   @IsOptional()
   @ValidateNested()

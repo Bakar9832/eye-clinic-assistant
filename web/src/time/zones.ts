@@ -10,7 +10,7 @@ export function zoneLabel(zone: string): string {
   return (zone.split('/').at(-1) ?? zone).replaceAll('_', ' ');
 }
 
-export interface TimeDisplay {
+interface TimeDisplay {
   /** Clinic time, e.g. "Mon 7 Jan 10:00". The visit happens there, so this always shows. */
   clinic: string;
   /** The viewer's time when their zone differs at that moment, else null. */

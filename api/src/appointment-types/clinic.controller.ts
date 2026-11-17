@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { clinicSettings } from '../clinic-settings.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 
 /** Public: what the web page needs before it can show any time or doctor. */
@@ -9,7 +10,7 @@ export class ClinicController {
   @Get()
   async info() {
     const [s, doctors] = await Promise.all([
-      this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } }),
+      clinicSettings(this.prisma),
       this.prisma.resource.findMany({ where: { kind: 'OPTOMETRIST', active: true }, orderBy: { displayName: 'asc' } }),
     ]);
     return {

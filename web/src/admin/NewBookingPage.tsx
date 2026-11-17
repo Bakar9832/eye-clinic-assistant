@@ -17,7 +17,7 @@ interface Booked {
   start: string;
 }
 
-export const MIN_REASON = 10;
+const MIN_REASON = 10;
 
 /**
  * Reception books for a patient (phone calls, the front desk). If the time breaks a soft

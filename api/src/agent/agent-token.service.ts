@@ -4,7 +4,7 @@ import { Clock } from '../clock.js';
 import { requireEnv } from '../config.js';
 
 /** How long the agent may act for one chat turn. */
-export const AGENT_TOKEN_MINUTES = 5;
+const AGENT_TOKEN_MINUTES = 5;
 
 /** Who the agent is acting for during one chat turn. Never chosen by the model. */
 export interface AgentIdentity {

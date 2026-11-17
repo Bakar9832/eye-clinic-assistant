@@ -6,6 +6,7 @@ import { AuditService, type Actor } from '../audit/audit.service.js';
 import { AvailabilityService } from '../availability/availability.service.js';
 import type { Slot } from '../availability/types.js';
 import { BookingService } from '../booking/booking.service.js';
+import { clinicSettings } from '../clinic-settings.js';
 import { Clock } from '../clock.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { OffersService } from '../offers/offers.service.js';
@@ -92,7 +93,7 @@ export type ToolName = keyof typeof TOOL_INPUTS;
  * (ROUTINE_EYE_TEST) for a follow-up instead of looking the code up. The codes are read
  * from the database, so a new appointment type reaches the tools without a code change.
  */
-export function toolInputs(types: { code: string; name: string }[]) {
+function toolInputs(types: { code: string; name: string }[]) {
   if (types.length === 0) return TOOL_INPUTS;
   const [first, ...rest] = types.map((t) => t.code);
   const type = z
@@ -151,7 +152,7 @@ const NEAR_SLOTS = 4;
 const minutes = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
 /** The free slots closest to a clinic time (ties: the earlier one), back in time order. */
-export function closestTo<T extends { start: Date }>(near: string, slots: T[], clinicTime: (start: Date) => string): T[] {
+function closestTo<T extends { start: Date }>(near: string, slots: T[], clinicTime: (start: Date) => string): T[] {
   const distance = (s: T) => Math.abs(minutes(clinicTime(s.start)) - minutes(near));
   return [...slots]
     .sort((a, b) => distance(a) - distance(b) || a.start.getTime() - b.start.getTime())
@@ -454,7 +455,7 @@ export class ClinicToolsService {
   }
 
   private settings() {
-    return this.prisma.clinicSetting.findUniqueOrThrow({ where: { id: 1 } });
+    return clinicSettings(this.prisma);
   }
 
   /** "2030-01-07" + "10:00" in clinic time → an exact moment. The backend converts, never the model. */
@@ -500,19 +501,16 @@ export class ClinicToolsService {
       where: { id },
       include: { appointmentType: true, allocations: { include: { resource: true } } },
     });
-    const doctor = doctorOf(a);
     return {
       data: {
         status,
         reference: a.reference,
         type: a.appointmentType.name,
         ...this.times(a.startsAt, timezone, who.viewerTimezone),
-        doctor,
+        doctor: doctorOf(a),
         preparation: a.appointmentType.prepInstructions,
       },
-      cards: [
-        { type: 'ticket', reference: a.reference, start: a.startsAt.toISOString(), doctor, prepInstructions: a.appointmentType.prepInstructions },
-      ],
+      cards: [ticketCard(a)],
     };
   }
 }
@@ -533,6 +531,22 @@ function dobRequired(): ToolResult {
 function examDoctor(slot: Slot, names: Map<string, { displayName: string; kind: string }>) {
   const exam = slot.assignments.find((a) => names.get(a.resourceId)?.kind === 'OPTOMETRIST');
   return exam ? { id: exam.resourceId, displayName: names.get(exam.resourceId)!.displayName } : null;
+}
+
+type AppointmentWithStaff = Parameters<typeof doctorOf>[0] & {
+  reference: string;
+  appointmentType: { prepInstructions: string };
+};
+
+/** The booking ticket the page shows, from the chat or the calendar. */
+export function ticketCard(a: AppointmentWithStaff): Card {
+  return {
+    type: 'ticket',
+    reference: a.reference,
+    start: a.startsAt.toISOString(),
+    doctor: doctorOf(a),
+    prepInstructions: a.appointmentType.prepInstructions,
+  };
 }
 
 /** The doctor for the appointment's current time (older holds remain from reschedules). */

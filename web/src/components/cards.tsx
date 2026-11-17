@@ -111,7 +111,7 @@ export type Offer = Extract<Card, { type: 'booking_offer' }>;
  * buttons are the answer. Only the newest offer can be used, so an old one can't book
  * by accident.
  */
-export function BookingOfferCard({ card, actions }: { card: Offer; actions: OfferActions }) {
+function BookingOfferCard({ card, actions }: { card: Offer; actions: OfferActions }) {
   return (
     <section aria-label="Booking offer" className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm">
       <p className="font-medium text-brand-800">{card.typeName}</p>
@@ -139,7 +139,7 @@ export function BookingOfferCard({ card, actions }: { card: Offer; actions: Offe
   );
 }
 
-export interface OfferActions {
+interface OfferActions {
   active: boolean;
   onConfirm: (card: Offer) => void;
   onOtherTime: () => void;

@@ -9,7 +9,7 @@ import { httpError } from '../http/http-error.js';
 import { DOB_UNLOCK_MINUTES, ResultsService } from '../results/results.service.js';
 
 /** Wrong dates of birth before the session is ended. */
-export const MAX_DOB_ATTEMPTS = 5;
+const MAX_DOB_ATTEMPTS = 5;
 
 class VerifyDobDto {
   @IsISO8601({ strict: true })
