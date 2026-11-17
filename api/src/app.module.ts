@@ -20,6 +20,9 @@ import { AvailabilityController } from './availability/availability.controller.j
 import { AvailabilityService } from './availability/availability.service.js';
 import { BookingService } from './booking/booking.service.js';
 import { Clock, SystemClock } from './clock.js';
+import { StaffGraphQLModule } from './graphql/graphql.config.js';
+import { AppointmentResolver, DoctorResolver } from './graphql/resolvers.js';
+import { StaffDashboardService } from './graphql/staff-dashboard.service.js';
 import { JsonOnlyMiddleware } from './http/json-only.middleware.js';
 import { createValidationPipe } from './http/validation.pipe.js';
 import { MeController } from './me/me.controller.js';
@@ -39,7 +42,7 @@ import { StaffClinicController } from './staff/staff-clinic.controller.js';
 import { StaffGuard } from './staff/staff.guard.js';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, StaffGraphQLModule],
   controllers: [
     ClinicController,
     AppointmentTypesController,
@@ -72,6 +75,9 @@ import { StaffGuard } from './staff/staff.guard.js';
     NotificationsWorker,
     RetentionService,
     RetentionWorker,
+    StaffDashboardService,
+    DoctorResolver,
+    AppointmentResolver,
     // Swapped for fakes in tests.
     { provide: Clock, useClass: SystemClock },
     { provide: EmailSender, useFactory: () => emailSenderFromEnv() },

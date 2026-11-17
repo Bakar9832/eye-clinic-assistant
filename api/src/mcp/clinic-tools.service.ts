@@ -549,14 +549,14 @@ export function ticketCard(a: AppointmentWithStaff): Card {
   };
 }
 
-/** The doctor for the appointment's current time (older holds remain from reschedules). */
-export function doctorOf(a: {
-  startsAt: Date;
-  endsAt: Date;
-  allocations: { startsAt: Date; endsAt: Date; resource: { kind: string; displayName: string } }[];
-}): string | null {
-  return (
-    a.allocations.find((x) => x.resource.kind === 'OPTOMETRIST' && x.startsAt >= a.startsAt && x.endsAt <= a.endsAt)
-      ?.resource.displayName ?? null
-  );
+type WithAllocations<R> = { startsAt: Date; endsAt: Date; allocations: { startsAt: Date; endsAt: Date; resource: R }[] };
+
+/** The doctor resource for the appointment's current time (older holds remain from reschedules). */
+export function examinerOf<R extends { kind: string }>(a: WithAllocations<R>): R | null {
+  return a.allocations.find((x) => x.resource.kind === 'OPTOMETRIST' && x.startsAt >= a.startsAt && x.endsAt <= a.endsAt)?.resource ?? null;
+}
+
+/** The doctor's name for the appointment's current time. */
+export function doctorOf(a: WithAllocations<{ kind: string; displayName: string }>): string | null {
+  return examinerOf(a)?.displayName ?? null;
 }

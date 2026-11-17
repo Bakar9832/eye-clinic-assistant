@@ -1,5 +1,6 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpStatus } from '@nestjs/common';
 import type { Response } from 'express';
+import { GraphQLError } from 'graphql';
 import { SchedulingError, type SchedulingErrorCode } from './scheduling-error.js';
 
 const STATUS: Record<SchedulingErrorCode, HttpStatus> = {
@@ -16,10 +17,13 @@ const STATUS: Record<SchedulingErrorCode, HttpStatus> = {
   ALREADY_BOOKED: HttpStatus.CONFLICT,
 };
 
-/** Turns a SchedulingError into a JSON response with its reasons. */
+/** Turns a SchedulingError into a JSON response with its reasons (a GraphQL error on the staff dashboard). */
 @Catch(SchedulingError)
 export class SchedulingErrorFilter implements ExceptionFilter {
   catch(error: SchedulingError, host: ArgumentsHost) {
+    if (host.getType<string>() === 'graphql') {
+      return new GraphQLError(error.reasons[0]?.message ?? error.code, { extensions: { code: error.code, reasons: error.reasons } });
+    }
     host
       .switchToHttp()
       .getResponse<Response>()

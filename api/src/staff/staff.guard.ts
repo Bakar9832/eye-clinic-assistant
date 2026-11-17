@@ -1,5 +1,6 @@
 import { CanActivate, createParamDecorator, ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
+import { GqlExecutionContext } from '@nestjs/graphql';
 import type { Request } from 'express';
 import type { Actor } from '../audit/audit.service.js';
 import { AuthService } from '../auth/auth.service.js';
@@ -16,6 +17,13 @@ export type StaffActor = Actor & { type: 'STAFF'; id: string; role: StaffRole; r
 
 type StaffRequest = Request & { staff?: StaffActor };
 
+/** The HTTP request behind a REST route or a GraphQL resolver (the staff dashboard). */
+function requestOf(context: ExecutionContext): StaffRequest {
+  return context.getType<string>() === 'graphql'
+    ? GqlExecutionContext.create(context).getContext<{ req: StaffRequest }>().req
+    : context.switchToHttp().getRequest<StaffRequest>();
+}
+
 /** Valid staff session + active account + allowed role, or no entry. */
 @Injectable()
 export class StaffGuard implements CanActivate {
@@ -25,7 +33,7 @@ export class StaffGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext) {
-    const req = context.switchToHttp().getRequest<StaffRequest>();
+    const req = requestOf(context);
     const session = await this.auth.findSession(req.cookies?.[STAFF_COOKIE]);
     // Checked on every request, so switching an account off locks it out immediately.
     if (!session?.staffUser?.active) {
@@ -49,7 +57,7 @@ export class StaffGuard implements CanActivate {
 }
 
 export const CurrentStaff = createParamDecorator((_: unknown, context: ExecutionContext): StaffActor => {
-  const req = context.switchToHttp().getRequest<StaffRequest>();
+  const req = requestOf(context);
   if (!req.staff) throw new Error('CurrentStaff used on a route without StaffGuard');
   return req.staff;
 });
