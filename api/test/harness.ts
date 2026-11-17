@@ -87,8 +87,8 @@ export interface TestApp {
 /** Tests start on 1 Jan 2030; the bookable test days are after that. */
 const START = new Date('2030-01-01T05:00:00Z');
 
-export async function createTestApp(): Promise<TestApp> {
-  const prisma = testPrisma();
+/** `prisma`: a client of your own, e.g. one that logs its queries. */
+export async function createTestApp(prisma: PrismaClient = testPrisma()): Promise<TestApp> {
   const clock = new FakeClock(START);
   const inbox = new FakeInbox();
   const agent = new FakeAgent();
