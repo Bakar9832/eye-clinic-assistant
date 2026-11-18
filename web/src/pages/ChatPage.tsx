@@ -106,8 +106,9 @@ export function ChatPage() {
   const actions = QUICK_ACTIONS.filter((a) => !a.loggedIn || me);
 
   return (
-    <div className="flex gap-6">
-      <div className="flex h-[calc(100vh-11rem)] min-h-[28rem] min-w-0 flex-1 flex-col rounded-xl border bg-white">
+    // Fills the page area exactly (the layout is one screen tall); only the messages scroll.
+    <div className="flex h-full min-h-[24rem] gap-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-xl border bg-white">
         {me === null && (
           <p className="m-4 mb-0 rounded bg-brand-50 px-4 py-3 text-brand-800">
             <strong>Chatting as a guest:</strong> ask about appointments and when doctors are free.{' '}
@@ -167,7 +168,7 @@ export function ChatPage() {
         </form>
       </div>
 
-      <aside aria-label="Quick actions" className="hidden w-72 shrink-0 space-y-4 xl:block">
+      <aside aria-label="Quick actions" className="hidden w-80 shrink-0 space-y-4 overflow-y-auto xl:block">
         <section className="rounded-xl border bg-white p-4">
           <h2 className="mb-3 font-medium">Try asking</h2>
           <div className="flex flex-col gap-2">
@@ -229,7 +230,7 @@ function Message({ role, text }: { role: Bubble['role']; text: string }) {
         ? 'bg-red-50 text-red-800'
         : 'bg-slate-100 text-slate-800';
   return (
-    <p role={role === 'error' ? 'alert' : undefined} className={`max-w-2xl whitespace-pre-wrap rounded-2xl px-4 py-3 text-lg ${style}`}>
+    <p role={role === 'error' ? 'alert' : undefined} className={`max-w-3xl whitespace-pre-wrap rounded-2xl px-4 py-3 text-lg ${style}`}>
       {text}
     </p>
   );

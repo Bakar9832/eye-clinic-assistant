@@ -27,9 +27,9 @@ export function Layout() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b bg-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+    <div className="flex h-dvh flex-col">
+      <header className="shrink-0 border-b bg-white">
+        <div className="mx-auto flex max-w-[112rem] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <Link to="/" className="text-lg font-semibold text-brand-700">
             {clinic?.name ?? 'Eye Clinic'}
           </Link>
@@ -73,9 +73,9 @@ export function Layout() {
         </div>
       </header>
       <ProfileBanner />
-      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-8 px-4 py-6">
-        <aside className="hidden w-60 shrink-0 lg:block">
-          <div className="sticky top-6 space-y-6">
+      <div className="mx-auto flex min-h-0 w-full max-w-[112rem] flex-1 gap-6 px-4 py-4 lg:px-6">
+        <aside className="hidden w-64 shrink-0 overflow-y-auto lg:block">
+          <div className="space-y-6">
             <nav aria-label="Sections (sidebar)" className="space-y-1">
               {nav.map((item) => (
                 <NavLink
@@ -98,11 +98,11 @@ export function Layout() {
             <ClinicCard />
           </div>
         </aside>
-        <main className="min-w-0 flex-1">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>
-      <footer className="border-t py-3 text-center text-xs text-slate-500">
+      <footer className="shrink-0 border-t py-1.5 text-center text-xs text-slate-500">
         Demo project with made-up data only. Not a real clinic, and nothing here is medical advice.
       </footer>
     </div>
@@ -139,8 +139,8 @@ function ProfileBanner() {
   const location = useLocation();
   if (!me || me.profileComplete || location.pathname === '/profile') return null;
   return (
-    <div role="status" className="border-b border-amber-200 bg-amber-50">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-amber-900">
+    <div role="status" className="shrink-0 border-b border-amber-200 bg-amber-50">
+      <div className="mx-auto flex max-w-[112rem] flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-amber-900">
         <span>Add your name and date of birth to book appointments or see results.</span>
         <Link to={`/profile?next=${encodeURIComponent(location.pathname)}`} className="font-medium underline underline-offset-2">
           Complete your details →

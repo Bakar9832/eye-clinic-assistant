@@ -8,11 +8,21 @@
   --color-brand-800: #134f57;
 }
 
-/* A little larger than the browser's 16px: every rem-based size in the app scales with it. */
+/* Text grows with the window: 16px on a laptop, up to 20px on a large monitor. Every
+   rem-based size (spacing, widths) scales with it, so the page keeps its proportions. */
 html {
-  font-size: 17px;
+  font-size: clamp(16px, 0.45vw + 9px, 20px);
 }
 
 body {
   @apply bg-slate-50 text-slate-800 antialiased;
+}
+
+/* Tailwind v4 draws borders in the text colour; a soft grey reads better on cards. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-slate-200);
+  }
 }
