@@ -21,6 +21,7 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
+    "set-password": "tsx prisma/set-password.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "eval": "tsc -p tsconfig.evals.json && node .eval-build/evals/run.js",

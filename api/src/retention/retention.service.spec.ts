@@ -99,6 +99,15 @@ describe('login codes and sessions', () => {
     expect((await prisma.loginCode.findMany()).map((c) => c.id)).toEqual([recent.id]);
   });
 
+  it('D3b. failed-login records go after 24 hours; recent ones stay for the rate limits', async () => {
+    const failure = (createdAt: Date) => prisma.loginFailure.create({ data: { email: 'test.two@example.com', ip: '203.0.113.7', createdAt } });
+    await failure(hoursAgo(25));
+    const recent = await failure(hoursAgo(0.5));
+
+    expect(await retention.runOnce()).toMatchObject({ loginFailures: 1 });
+    expect((await prisma.loginFailure.findMany()).map((f) => f.id)).toEqual([recent.id]);
+  });
+
   it('D4. sessions go a day after they stopped working; nobody is logged out', async () => {
     const session = (tokenHash: string, expiresAt: Date, revokedAt?: Date) =>
       prisma.session.create({ data: { tokenHash, patientId: clinic.patients.two.id, createdAt: daysAgo(10), expiresAt, revokedAt } });
@@ -142,17 +151,19 @@ describe('what is kept, and the record of each run', () => {
   it('D6. a second run deletes nothing more; each run is audited with counts only', async () => {
     await chat(31);
     // The audit log is append-only, so it still holds earlier tests' runs: count the difference.
-    const runsBefore = await prisma.auditEvent.count({ where: { action: 'RETENTION_RUN' } });
+    const before = new Set((await prisma.auditEvent.findMany({ where: { action: 'RETENTION_RUN' } })).map((r) => r.id));
 
     const first = await retention.runOnce();
     const second = await retention.runOnce();
 
-    expect(first).toEqual({ chats: 1, handoffs: 0, loginCodes: 0, sessions: 0 });
-    expect(second).toEqual({ chats: 0, handoffs: 0, loginCodes: 0, sessions: 0 });
+    expect(first).toEqual({ chats: 1, handoffs: 0, loginCodes: 0, loginFailures: 0, sessions: 0 });
+    expect(second).toEqual({ chats: 0, handoffs: 0, loginCodes: 0, loginFailures: 0, sessions: 0 });
     const runs = await prisma.auditEvent.findMany({ where: { action: 'RETENTION_RUN' } });
-    expect(runs).toHaveLength(runsBefore + 2);
-    for (const run of runs) {
-      expect(Object.keys(run.details as object).sort()).toEqual(['chats', 'handoffs', 'loginCodes', 'sessions']);
+    // Only this test's two runs: older rows may predate a newly counted table.
+    const ours = runs.filter((r) => !before.has(r.id));
+    expect(ours).toHaveLength(2);
+    for (const run of ours) {
+      expect(Object.keys(run.details as object).sort()).toEqual(['chats', 'handoffs', 'loginCodes', 'loginFailures', 'sessions']);
     }
     expect(JSON.stringify(runs)).not.toContain('pink');
   });

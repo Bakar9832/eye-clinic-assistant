@@ -3,7 +3,7 @@
 
 import { DateTime } from 'luxon';
 import { seedClinic } from '../prisma/clinic-data.js';
-import { createTestApp, login, ZONE, type TestApp } from './harness.js';
+import { createTestApp, login, signUp, TEST_PASSWORD, ZONE, type TestApp } from './harness.js';
 
 let t: TestApp;
 let clinic: Awaited<ReturnType<typeof seedClinic>>;
@@ -150,9 +150,7 @@ describe('moving and cancelling', () => {
 
 describe('audit log', () => {
   it('D1. login, failed login, book, move and cancel are recorded against the patient from the session', async () => {
-    await t.http().post('/auth/request-code').send({ email: DEMO });
-    const wrong = t.inbox.lastCode(DEMO) === '000000' ? '111111' : '000000';
-    await t.http().post('/auth/verify').send({ email: DEMO, code: wrong }).expect(401);
+    await t.http().post('/auth/login').send({ email: DEMO, password: 'wrong-password' }).expect(401);
     const browser = await login(t, DEMO);
     const booked = (await browser.post('/me/appointments').send(followUp('09:00')).expect(201)).body;
     await browser.post(`/me/appointments/${booked.id}/reschedule`).send({ start: at('11:00') }).expect(200);
@@ -168,21 +166,21 @@ describe('audit log', () => {
     for (const e of events.filter((e) => e.action.startsWith('APPOINTMENT_'))) {
       expect(e).toMatchObject({ actorType: 'PATIENT', entityType: 'Appointment', entityId: booked.id });
     }
-    // A failed login has no patient yet (the code proved nothing), so it's recorded as SYSTEM with the IP.
+    // A failed login proved nothing about who it was, so it's recorded as SYSTEM with the IP.
     expect(await t.prisma.auditEvent.count({ where: { action: 'LOGIN_FAILED', at: { gte: t.clock.now() } } })).toBeGreaterThan(0);
   });
 
-  it('D2. the audit log never contains codes, session tokens or dates of birth', async () => {
+  it('D2. the audit log never contains codes, passwords, session tokens or dates of birth', async () => {
     const browser = t.browser();
-    await browser.post('/auth/request-code').send({ email: DEMO });
+    const res = await signUp(t, browser, DEMO);
     const code = t.inbox.lastCode(DEMO);
-    const res = await browser.post('/auth/verify').send({ email: DEMO, code }).expect(200);
     const token = decodeURIComponent(([] as string[]).concat(res.headers['set-cookie'])[0].split(';')[0].slice('session='.length));
     await browser.post('/me/appointments').send(followUp('09:00')).expect(201);
 
     const everything = JSON.stringify(await t.prisma.auditEvent.findMany());
     expect(everything).not.toContain(code);
     expect(everything).not.toContain(token);
+    expect(everything).not.toContain(TEST_PASSWORD);
     expect(everything).not.toContain('1990-01-15'); // the demo patient's date of birth
   });
 

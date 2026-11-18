@@ -36,6 +36,26 @@ npx prisma db seed
 Remove-Item Env:DATABASE_URL
 ```
 
+### Passwords on the live database
+
+The seed gives every made-up patient `SEED_PATIENT_PASSWORD` and every staff member
+`SEED_STAFF_PASSWORD` (both from your `.env`). A database seeded before passwords existed
+has none: set them one account at a time, without wiping anything. The password is read from
+the environment, so it stays out of your shell history:
+
+```powershell
+cd api
+$env:DATABASE_URL = "<the session pooler string>"
+$env:NEW_PASSWORD = "<a password, at least 8 characters>"
+npm run set-password -- staff admin@clinic.example
+npm run set-password -- patient demo.patient@example.com
+Remove-Item Env:NEW_PASSWORD, Env:DATABASE_URL
+```
+
+Staff can't sign up or reset their own password (their addresses are made up); this script
+is how it's done. Patients sign up on the site with an emailed code, so **sign-up needs real
+email** (the SMTP settings below).
+
 ## 2. API and agent (Render)
 
 1. Render → **New → Blueprint** → connect the GitHub repo. Render reads `render.yaml` and
@@ -68,9 +88,11 @@ Remove-Item Env:DATABASE_URL
 | `AGENT_SERVICE_KEY` | secret, same as the agent's | Proves to the agent that a request comes from the API. |
 | `AGENT_URL` | the agent's Render URL | Where the API sends chat turns. |
 | `DEMO_MODE` | `false` | `true` enables the open "Try as demo patient" button (development only). |
-| `SMTP_HOST` | empty | Email server. Empty = emails are written to the log instead. |
-| `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD` | unset | Only with an email server. |
-| `EMAIL_FROM` | `Demo Eye Clinic <no-reply@clinic.example>` | Sender of clinic emails. |
+| `SMTP_HOST` | `smtp-relay.brevo.com` | Email server (sign-up and reset codes). Empty = emails are written to the log instead. |
+| `SMTP_PORT` | `2525` | Render's free plan blocks the usual mail ports (25, 465, 587); Brevo also listens on 2525. |
+| `SMTP_SECURE` | `false` | `true` only for port 465. |
+| `SMTP_USER`, `SMTP_PASSWORD` | Brevo's SMTP login and SMTP key (secret) | Brevo → SMTP & API → SMTP. |
+| `EMAIL_FROM` | `Demo Eye Clinic <a sender you verified in Brevo>` | Sender of clinic emails. Brevo refuses senders it hasn't verified. |
 | `NOTIFICATIONS_EVERY_SECONDS` | `0` | How often reminders are sent; `0` = off (demo addresses are fake). |
 | `RETENTION_EVERY_HOURS` | `24` | How often old chats, codes and sessions are deleted. |
 | `PORT` | set by Render | The port to listen on (default 3000). |
@@ -91,7 +113,8 @@ Remove-Item Env:DATABASE_URL
 | `AGENT_PROMPT` | unset (`full`) | `minimal` is the evals' baseline prompt. |
 | `PYTHON_VERSION` | `3.14.3` | Render's Python version. |
 
-**Local only** (development and tests, root `.env`): `TEST_DATABASE_URL` (wiped by the tests;
+**Local only** (development and tests, root `.env`): `SEED_PATIENT_PASSWORD` and
+`SEED_STAFF_PASSWORD` (the seed's passwords), `TEST_DATABASE_URL` (wiped by the tests;
 its name must contain "test"), `EVAL_DATABASE_URL`, `EVAL_MAX_LLM_CALLS_PER_MINUTE`,
 `EVAL_GRADER_BASE_URL`, `EVAL_GRADER_API_KEY`, `EVAL_GRADER_MODEL`, `CLINIC_API_URL`.
 `SUPABASE_*` lines in `.env` are notes; the code reads only `DATABASE_URL`.

@@ -24,6 +24,7 @@ export async function seedClinic(prisma: PrismaClient, timezone: string) {
   // Children first, so foreign keys don't block the wipe. Sessions go with their owners.
   await prisma.notification.deleteMany();
   await prisma.loginCode.deleteMany();
+  await prisma.loginFailure.deleteMany();
   await prisma.handoffRequest.deleteMany();
   await prisma.conversation.deleteMany();
   await prisma.offer.deleteMany();

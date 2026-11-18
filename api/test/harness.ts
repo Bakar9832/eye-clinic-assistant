@@ -10,6 +10,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { AddressInfo } from 'node:net';
 import { AppModule } from '../src/app.module.js';
+import { hashPassword } from '../src/auth/password.js';
 import { AgentClient, type AgentTurnRequest, type AgentTurnResponse } from '../src/chat/agent-client.js';
 import { Clock } from '../src/clock.js';
 import { PrismaClient } from '../src/generated/prisma/client.js';
@@ -126,20 +127,49 @@ export async function createTestApp(prisma: PrismaClient = testPrisma()): Promis
   };
 }
 
-/** Logs a staff member in through the staff door and returns a browser holding the staff cookie. */
-export async function staffLogin(t: TestApp, email: string) {
+/** The password every test account gets. */
+export const TEST_PASSWORD = 'test-password-123';
+
+/**
+ * Logs a staff member in through the staff door and returns a browser holding the staff
+ * cookie. Seeded staff have no password, so the first login gives them TEST_PASSWORD.
+ */
+export async function staffLogin(t: Pick<TestApp, 'browser' | 'prisma'>, email: string) {
+  const staff = await t.prisma.staffUser.findUniqueOrThrow({ where: { email } });
+  if (!staff.passwordHash) {
+    await t.prisma.staffUser.update({ where: { id: staff.id }, data: { passwordHash: await hashPassword(TEST_PASSWORD) } });
+  }
   const browser = t.browser();
-  await browser.post('/staff/auth/request-code').send({ email }).expect(202);
-  await browser.post('/staff/auth/verify').send({ email, code: t.inbox.lastCode(email) }).expect(200);
+  await browser.post('/staff/auth/login').send({ email, password: TEST_PASSWORD }).expect(200);
   return browser;
 }
 
-/** Logs in through the real email-code flow and returns a browser holding the session cookie. */
-export async function login(t: Pick<TestApp, 'browser' | 'inbox'>, email: string) {
+/**
+ * Logs a patient in through the real flows and returns a browser holding the session cookie:
+ * email + password if they have one, otherwise sign-up (emailed code, then TEST_PASSWORD).
+ */
+export async function login(t: Pick<TestApp, 'browser' | 'inbox' | 'prisma'>, email: string) {
+  const normalised = email.trim().toLowerCase();
   const browser = t.browser();
-  await browser.post('/auth/request-code').send({ email }).expect(202);
-  await browser.post('/auth/verify').send({ email, code: t.inbox.lastCode(email.trim().toLowerCase()) }).expect(200);
+  const patient = await t.prisma.patient.findUnique({ where: { email: normalised } });
+  if (patient?.passwordHash) {
+    await browser.post('/auth/login').send({ email, password: TEST_PASSWORD }).expect(200);
+  } else {
+    await signUp(t, browser, email);
+  }
   return browser;
+}
+
+/** Sign-up (or reset) through the emailed code; returns the set-password response. */
+export async function signUp(
+  t: Pick<TestApp, 'inbox'>,
+  browser: ReturnType<typeof request.agent>,
+  email: string,
+  password = TEST_PASSWORD,
+) {
+  await browser.post('/auth/request-code').send({ email }).expect(202);
+  const code = t.inbox.lastCode(email.trim().toLowerCase());
+  return browser.post('/auth/set-password').send({ email, code, password }).expect(200);
 }
 
 /** An MCP client that connects the way the Python agent will: agent token in the header. */

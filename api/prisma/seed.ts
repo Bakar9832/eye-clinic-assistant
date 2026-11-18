@@ -1,11 +1,14 @@
 // Seeds the development database with synthetic data only.
 // Safe to re-run: it wipes the clinic tables first.
 // Run with: npx prisma db seed
+// Needs SEED_PATIENT_PASSWORD and SEED_STAFF_PASSWORD in .env: every seeded patient and
+// staff member gets one of them, so you can log in without email. They are never in the repo.
 
 import path from 'node:path';
 import { config } from 'dotenv';
 import { DateTime } from 'luxon';
 import { AuditService } from '../src/audit/audit.service.js';
+import { hashPassword, PASSWORD_MIN } from '../src/auth/password.js';
 import { AvailabilityService } from '../src/availability/availability.service.js';
 import { BookingService } from '../src/booking/booking.service.js';
 import { generateReference } from '../src/booking/reference.js';
@@ -18,6 +21,15 @@ config({ path: path.resolve(import.meta.dirname, '..', '..', '.env') });
 if (process.env.NODE_ENV === 'production') {
   throw new Error('Refusing to seed a production database.');
 }
+
+/** Checked before anything is wiped, so a missing setting can't leave an empty database. */
+function seedPassword(name: string) {
+  const value = process.env[name] ?? '';
+  if (value.length < PASSWORD_MIN) throw new Error(`Set ${name} in .env (at least ${PASSWORD_MIN} characters) before seeding.`);
+  return value;
+}
+const patientPassword = seedPassword('SEED_PATIENT_PASSWORD');
+const staffPassword = seedPassword('SEED_STAFF_PASSWORD');
 
 const prisma = createPrismaClient(process.env.DATABASE_URL!);
 
@@ -127,6 +139,14 @@ async function main() {
   });
 
   const booked = await seedBusierCalendar();
+
+  // Each account hashed separately, so each gets its own salt.
+  for (const { id } of await prisma.patient.findMany({ select: { id: true } })) {
+    await prisma.patient.update({ where: { id }, data: { passwordHash: await hashPassword(patientPassword) } });
+  }
+  for (const { id } of await prisma.staffUser.findMany({ select: { id: true } })) {
+    await prisma.staffUser.update({ where: { id }, data: { passwordHash: await hashPassword(staffPassword) } });
+  }
   console.log(`Seeded clinic (timezone ${clinicTimezone}), plus a third doctor and ${booked} bookings for other patients.`);
 }
 

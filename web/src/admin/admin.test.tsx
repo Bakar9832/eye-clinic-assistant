@@ -28,23 +28,21 @@ function staffApi(me: StaffMe, routes: Parameters<typeof mockApi>[0] = {}) {
 const navLinks = () => within(screen.getByRole('navigation')).getAllByRole('link').map((l) => l.textContent);
 
 describe('A1. staff login', () => {
-  it('sends a visitor to the staff login, and in after email and code', async () => {
+  it('sends a visitor to the staff login, and in after email and password', async () => {
     let loggedIn = false;
     const api = mockApi({
       'GET /staff/me': () => (loggedIn ? { body: RECEPTION } : { status: 401, body: { error: 'UNAUTHENTICATED' } }),
-      'POST /staff/auth/request-code': { status: 202, body: {} },
-      'POST /staff/auth/verify': () => ((loggedIn = true), { body: { loggedIn: true } }),
+      'POST /staff/auth/login': () => ((loggedIn = true), { body: { loggedIn: true } }),
       'GET /staff/schedule': { body: { appointments: [] } },
     });
     renderApp('/admin');
 
     await userEvent.type(await screen.findByLabelText('Work email'), RECEPTION.email);
-    await userEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
-    await userEvent.type(await screen.findByLabelText(/Code sent to/), '123456');
+    await userEvent.type(screen.getByLabelText('Password'), 'staff-password');
     await userEvent.click(screen.getByRole('button', { name: 'Log in' }));
 
     expect(await screen.findByRole('heading', { name: 'Schedule' })).toBeInTheDocument();
-    expect(api.calls.find((c) => c.path === '/staff/auth/verify')?.body).toEqual({ email: RECEPTION.email, code: '123456' });
+    expect(api.calls.find((c) => c.path === '/staff/auth/login')?.body).toEqual({ email: RECEPTION.email, password: 'staff-password' });
   });
 });
 

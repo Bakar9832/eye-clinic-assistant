@@ -10,6 +10,7 @@ export interface RetentionResult {
   chats: number;
   handoffs: number;
   loginCodes: number;
+  loginFailures: number;
   sessions: number;
 }
 
@@ -42,12 +43,13 @@ export class RetentionService {
     const handoffs = await this.prisma.handoffRequest.deleteMany({ where: { status: 'CLOSED', createdAt: { lt: chatCutoff } } });
     // The rate limits look back at most an hour; a day leaves plenty of margin.
     const loginCodes = await this.prisma.loginCode.deleteMany({ where: { createdAt: { lt: dayAgo } } });
+    const loginFailures = await this.prisma.loginFailure.deleteMany({ where: { createdAt: { lt: dayAgo } } });
     // Only sessions that already stopped working a day ago: nobody is logged out by this.
     const sessions = await this.prisma.session.deleteMany({
       where: { OR: [{ expiresAt: { lt: dayAgo } }, { revokedAt: { lt: dayAgo } }] },
     });
 
-    const result = { chats: chats.count, handoffs: handoffs.count, loginCodes: loginCodes.count, sessions: sessions.count };
+    const result = { chats: chats.count, handoffs: handoffs.count, loginCodes: loginCodes.count, loginFailures: loginFailures.count, sessions: sessions.count };
     // Counts only, never what was deleted.
     await this.audit.record({ actor: SYSTEM, action: 'RETENTION_RUN', details: { ...result } });
     return result;

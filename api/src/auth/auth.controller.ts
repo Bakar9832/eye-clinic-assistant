@@ -1,6 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Ip, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { RequestCodeDto, VerifyDto } from './auth.dto.js';
+import { LoginDto, RequestCodeDto, SetPasswordDto } from './auth.dto.js';
 import { AuthService, type NewSession } from './auth.service.js';
 import { SESSION_COOKIE } from './session.guard.js';
 
@@ -15,10 +15,18 @@ export class AuthController {
     return { message: 'If that address can receive email, a code is on its way.' };
   }
 
-  @Post('verify')
+  /** Sign-up or forgot password: the emailed code, then the new password. Logs in. */
+  @Post('set-password')
   @HttpCode(HttpStatus.OK)
-  async verify(@Body() body: VerifyDto, @Ip() ip: string, @Res({ passthrough: true }) res: Response) {
-    setSessionCookie(res, await this.auth.verify(body.email, body.code, ip));
+  async setPassword(@Body() body: SetPasswordDto, @Ip() ip: string, @Res({ passthrough: true }) res: Response) {
+    setSessionCookie(res, await this.auth.setPassword(body.email, body.code, body.password, ip));
+    return { loggedIn: true };
+  }
+
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  async login(@Body() body: LoginDto, @Ip() ip: string, @Res({ passthrough: true }) res: Response) {
+    setSessionCookie(res, await this.auth.login(body.email, body.password, ip, 'PATIENT'));
     return { loggedIn: true };
   }
 

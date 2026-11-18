@@ -28,7 +28,7 @@ export class RetentionWorker implements OnApplicationBootstrap, OnApplicationShu
   private async tick() {
     try {
       const deleted = await this.retention.runOnce();
-      this.logger.log(`Deleted ${deleted.chats} chat(s), ${deleted.handoffs} handoff(s), ${deleted.loginCodes} login code(s), ${deleted.sessions} session(s)`);
+      this.logger.log(`Deleted ${deleted.chats} chat(s), ${deleted.handoffs} handoff(s), ${deleted.loginCodes} login code(s), ${deleted.loginFailures} failed login(s), ${deleted.sessions} session(s)`);
     } catch (error) {
       this.logger.error(`Cleanup failed: ${(error as Error).message}`);
     }

@@ -1,7 +1,7 @@
-// Login, sessions and profile, over HTTP.
+// Sign-up, login, password reset, sessions and profile, over HTTP.
 
 import { createHash } from 'node:crypto';
-import { createTestApp, login, type TestApp } from './harness.js';
+import { createTestApp, login, signUp, TEST_PASSWORD, type TestApp } from './harness.js';
 
 let t: TestApp;
 const DEMO = 'demo.patient@example.com';
@@ -65,11 +65,18 @@ describe('requesting a code', () => {
   });
 });
 
-describe('verifying a code', () => {
-  it('A3. the right code sets an HttpOnly, SameSite=Lax session cookie that works', async () => {
+describe('sign-up and password reset (emailed code, then a password)', () => {
+  /** Requests a code for `email` and returns it. */
+  async function codeFor(email: string) {
+    await t.http().post('/auth/request-code').send({ email }).expect(202);
+    return t.inbox.lastCode(email);
+  }
+  const setPassword = (email: string, code: string, password = TEST_PASSWORD) =>
+    t.http().post('/auth/set-password').send({ email, code, password });
+
+  it('A3. sign-up: the right code and a password set an HttpOnly, SameSite=Lax session cookie that works', async () => {
     const browser = t.browser();
-    await browser.post('/auth/request-code').send({ email: DEMO }).expect(202);
-    const res = await browser.post('/auth/verify').send({ email: DEMO, code: t.inbox.lastCode(DEMO) }).expect(200);
+    const res = await signUp(t, browser, NEW_PERSON);
 
     const cookie = sessionCookie(res);
     expect(cookie).toMatch(/HttpOnly/i);
@@ -77,41 +84,77 @@ describe('verifying a code', () => {
     expect(cookie).toMatch(/Path=\//);
 
     const me = await browser.get('/me').expect(200);
-    expect(me.body.email).toBe(DEMO);
+    expect(me.body.email).toBe(NEW_PERSON);
+    expect(t.inbox.sent.at(-1)!.subject).toBe('Your sign-up code');
+  });
+
+  it('PW5. the database keeps an scrypt hash, never the password; equal passwords hash differently', async () => {
+    await signUp(t, t.browser(), NEW_PERSON, 'same-password-1');
+    await signUp(t, t.browser(), 'other.person@example.com', 'same-password-1');
+
+    const rows = await t.prisma.patient.findMany({ where: { email: { in: [NEW_PERSON, 'other.person@example.com'] } } });
+    expect(rows).toHaveLength(2);
+    for (const row of rows) expect(row.passwordHash).toMatch(/^scrypt\$/);
+    expect(rows[0].passwordHash).not.toBe(rows[1].passwordHash);
+    expect(JSON.stringify(rows)).not.toContain('same-password-1');
+    // Nor in the audit log.
+    expect(JSON.stringify(await t.prisma.auditEvent.findMany())).not.toContain('same-password-1');
+  });
+
+  it('PW6. a password under 8 characters is refused, and the code still works afterwards', async () => {
+    const code = await codeFor(NEW_PERSON);
+    const res = await setPassword(NEW_PERSON, code, 'short').expect(400);
+    expect(res.body.error).toBe('INVALID_INPUT');
+    expect(await t.prisma.patient.count({ where: { email: NEW_PERSON } })).toBe(0);
+
+    await setPassword(NEW_PERSON, code).expect(200);
+  });
+
+  it('PW7. a wrong or expired code sets no password', async () => {
+    const code = await codeFor(DEMO);
+    await setPassword(DEMO, code === '000000' ? '111111' : '000000').expect(401);
+    t.clock.advanceMinutes(11);
+    await setPassword(DEMO, code).expect(401);
+
+    const demo = await t.prisma.patient.findUniqueOrThrow({ where: { email: DEMO } });
+    expect(demo.passwordHash).toBeNull();
   });
 
   it('A4. after 5 wrong guesses the code is dead, even the right one', async () => {
-    await t.http().post('/auth/request-code').send({ email: DEMO });
-    const right = t.inbox.lastCode(DEMO);
+    const right = await codeFor(DEMO);
     const wrong = right === '000000' ? '111111' : '000000';
 
-    for (let i = 0; i < 5; i++) {
-      await t.http().post('/auth/verify').send({ email: DEMO, code: wrong }).expect(401);
-    }
-    await t.http().post('/auth/verify').send({ email: DEMO, code: right }).expect(401);
-  });
-
-  it('A5. a code older than 10 minutes is refused', async () => {
-    await t.http().post('/auth/request-code').send({ email: DEMO });
-    t.clock.advanceMinutes(11);
-    await t.http().post('/auth/verify').send({ email: DEMO, code: t.inbox.lastCode(DEMO) }).expect(401);
+    for (let i = 0; i < 5; i++) await setPassword(DEMO, wrong).expect(401);
+    await setPassword(DEMO, right).expect(401);
   });
 
   it('A6. a code works only once', async () => {
-    await t.http().post('/auth/request-code').send({ email: DEMO });
-    const code = t.inbox.lastCode(DEMO);
-    await t.http().post('/auth/verify').send({ email: DEMO, code }).expect(200);
-    await t.http().post('/auth/verify').send({ email: DEMO, code }).expect(401);
+    const code = await codeFor(DEMO);
+    await setPassword(DEMO, code).expect(200);
+    await setPassword(DEMO, code, 'another-password').expect(401);
   });
 
   it('A7. asking for a new code retires the previous one', async () => {
-    await t.http().post('/auth/request-code').send({ email: DEMO });
-    const first = t.inbox.lastCode(DEMO);
-    await t.http().post('/auth/request-code').send({ email: DEMO });
-    const second = t.inbox.lastCode(DEMO);
+    const first = await codeFor(DEMO);
+    const second = await codeFor(DEMO);
 
-    if (first !== second) await t.http().post('/auth/verify').send({ email: DEMO, code: first }).expect(401);
-    await t.http().post('/auth/verify').send({ email: DEMO, code: second }).expect(200);
+    if (first !== second) await setPassword(DEMO, first).expect(401);
+    await setPassword(DEMO, second).expect(200);
+  });
+
+  it('PW8. forgot password: the new password works, the old one does not, and old sessions are logged out', async () => {
+    const laptop = await login(t, DEMO); // signs up with TEST_PASSWORD
+    await laptop.get('/me').expect(200);
+    expect((await t.http().post('/auth/request-code').send({ email: DEMO })).status).toBe(202);
+    expect(t.inbox.sent.at(-1)!.subject).toBe('Your password reset code');
+
+    const phone = t.browser();
+    await phone.post('/auth/set-password').send({ email: DEMO, code: t.inbox.lastCode(DEMO), password: 'brand-new-password' }).expect(200);
+
+    await phone.get('/me').expect(200);
+    await laptop.get('/me').expect(401);
+    await t.http().post('/auth/login').send({ email: DEMO, password: TEST_PASSWORD }).expect(401);
+    await t.http().post('/auth/login').send({ email: DEMO, password: 'brand-new-password' }).expect(200);
   });
 
   it('A13. email case and spaces don\'t matter: same person, same account', async () => {
@@ -127,11 +170,70 @@ describe('verifying a code', () => {
   });
 });
 
+describe('logging in with a password', () => {
+  const loginWith = (email: string, password: string) => t.http().post('/auth/login').send({ email, password });
+
+  beforeEach(async () => {
+    await signUp(t, t.browser(), DEMO); // DEMO now has TEST_PASSWORD
+  });
+
+  it('PW9. the right password logs in; the session works', async () => {
+    const browser = t.browser();
+    const res = await browser.post('/auth/login').send({ email: ' Demo.Patient@example.com', password: TEST_PASSWORD }).expect(200);
+    expect(sessionCookie(res)).toMatch(/HttpOnly/i);
+    expect((await browser.get('/me').expect(200)).body.email).toBe(DEMO);
+  });
+
+  it('PW10. a wrong password, an unknown email and an account with no password all get the same 401', async () => {
+    const wrongPassword = await loginWith(DEMO, 'not-the-password');
+    const unknownEmail = await loginWith('nobody@example.com', TEST_PASSWORD);
+    const noPassword = await loginWith('test.two@example.com', TEST_PASSWORD); // seeded, never signed up
+
+    for (const res of [wrongPassword, unknownEmail, noPassword]) {
+      expect(res.status).toBe(401);
+      expect(res.body).toEqual(wrongPassword.body);
+    }
+    expect(wrongPassword.body).toEqual({ error: 'INVALID_LOGIN', reasons: [{ code: 'INVALID_LOGIN', message: 'Email or password is incorrect.' }] });
+    expect(wrongPassword.headers['set-cookie']).toBeUndefined();
+  });
+
+  it('PW11. after 5 wrong passwords for an email, even the right one is refused for 15 minutes', async () => {
+    for (let i = 0; i < 5; i++) await loginWith(DEMO, `wrong-${i}-password`).expect(401);
+    const locked = await loginWith(DEMO, TEST_PASSWORD).expect(429);
+    expect(locked.body.error).toBe('RATE_LIMITED');
+
+    t.clock.advanceMinutes(16);
+    await loginWith(DEMO, TEST_PASSWORD).expect(200);
+  });
+
+  it('PW12. an unknown email is limited exactly like a real one, so the limit reveals nothing', async () => {
+    for (let i = 0; i < 5; i++) await loginWith('nobody@example.com', `wrong-${i}-password`).expect(401);
+    await loginWith('nobody@example.com', TEST_PASSWORD).expect(429);
+  });
+
+  it('PW13. 20 failures from one IP block that IP, whatever email it tries next', async () => {
+    for (let i = 0; i < 20; i++) await loginWith(`person${i}@example.com`, 'some-password').expect(401);
+    await loginWith(DEMO, TEST_PASSWORD).expect(429);
+  });
+
+  it('PW14. failures are recorded without the password', async () => {
+    await loginWith(DEMO, 'secret-guess-123').expect(401);
+    const failures = await t.prisma.loginFailure.findMany();
+    expect(failures).toHaveLength(1);
+    expect(failures[0].email).toBe(DEMO);
+    const everything = JSON.stringify([failures, await t.prisma.auditEvent.findMany()]);
+    expect(everything).not.toContain('secret-guess-123');
+  });
+
+  it('PW15. the old code-only login is gone', async () => {
+    await t.http().post('/auth/verify').send({ email: DEMO, code: '123456' }).expect(404);
+  });
+});
+
 describe('sessions', () => {
   it('A10. after logout the old cookie no longer works', async () => {
     const browser = t.browser();
-    await browser.post('/auth/request-code').send({ email: DEMO });
-    const res = await browser.post('/auth/verify').send({ email: DEMO, code: t.inbox.lastCode(DEMO) });
+    const res = await signUp(t, browser, DEMO);
     const stolen = sessionCookie(res).split(';')[0];
 
     await browser.post('/auth/logout').set('Content-Type', 'application/json').expect(204);
@@ -148,9 +250,7 @@ describe('sessions', () => {
   });
 
   it('A12. the database stores only a hash of the session token', async () => {
-    const browser = t.browser();
-    await browser.post('/auth/request-code').send({ email: DEMO });
-    const res = await browser.post('/auth/verify').send({ email: DEMO, code: t.inbox.lastCode(DEMO) });
+    const res = await signUp(t, t.browser(), DEMO);
     const token = decodeURIComponent(sessionCookie(res).split(';')[0].slice('session='.length));
 
     const sessions = await t.prisma.session.findMany();

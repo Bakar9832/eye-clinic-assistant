@@ -4,7 +4,7 @@
 
 import { DateTime } from 'luxon';
 import { seedClinic } from '../prisma/clinic-data.js';
-import { createTestApp, login, staffLogin, ZONE, type TestApp } from './harness.js';
+import { createTestApp, login, signUp, staffLogin, ZONE, type TestApp } from './harness.js';
 
 let t: TestApp;
 let clinic: Awaited<ReturnType<typeof seedClinic>>;
@@ -75,12 +75,7 @@ describe('staff only', () => {
   });
 
   it("S3. a patient's session token in the staff cookie is still refused", async () => {
-    await t.http().post('/auth/request-code').send({ email: DEMO }).expect(202);
-    const verified = await t
-      .http()
-      .post('/auth/verify')
-      .send({ email: DEMO, code: t.inbox.lastCode(DEMO) })
-      .expect(200);
+    const verified = await signUp(t, t.browser(), DEMO);
     const token = /session=([^;]+)/.exec(String(verified.headers['set-cookie']))![1];
 
     const body = (await t.http().post('/staff/graphql').set('Cookie', `staff_session=${token}`).send({ query: '{ doctors { id } }' })).body as GqlBody;

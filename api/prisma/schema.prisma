@@ -95,6 +95,8 @@ model StaffUser {
   resource    Resource?  @relation(fields: [resourceId], references: [id])
   /// false = can't log in, and open sessions stop working.
   active      Boolean    @default(true)
+  /// scrypt hash (see src/auth/password.ts). Set by the seed or scripts/set-password.ts; null = can't log in.
+  passwordHash String?   @map("password_hash")
   sessions    Session[]
   outcomes    Outcome[]
 
@@ -180,6 +182,8 @@ model Patient {
   isDemo       Boolean       @default(false) @map("is_demo")
   /// Display zone the patient chose, so it follows them across devices. Never used for booking maths.
   timezone     String?
+  /// scrypt hash (see src/auth/password.ts). null until the patient signs up with an emailed code.
+  passwordHash String?       @map("password_hash")
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   appointments Appointment[]
   sessions     Session[]
@@ -197,6 +201,20 @@ enum LoginPurpose {
 }
 
 /// A one-time login code. Only a keyed hash is stored; rows are kept for rate limiting.
+/// One row per wrong password (or unknown email), for the login rate limits.
+/// Not the audit log: it holds the email typed, and is deleted after a day.
+model LoginFailure {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// Trimmed and lower-case, whether or not an account exists.
+  email     String
+  ip        String?
+  createdAt DateTime @map("created_at") @db.Timestamptz(3)
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+  @@map("login_failures")
+}
+
 model LoginCode {
   id         String       @id @default(uuid()) @db.Uuid
   purpose    LoginPurpose @default(PATIENT)
