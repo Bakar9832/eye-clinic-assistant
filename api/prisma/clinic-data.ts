@@ -10,7 +10,7 @@ const hm = (time: string) => {
 };
 
 // weekday: 1 = Monday ... 7 = Sunday
-const hours = (weekdays: number[], start: string, end: string) =>
+export const hours = (weekdays: number[], start: string, end: string) =>
   weekdays.map((weekday) => ({ weekday, startMin: hm(start), endMin: hm(end) }));
 
 export const MON_FRI = [1, 2, 3, 4, 5];

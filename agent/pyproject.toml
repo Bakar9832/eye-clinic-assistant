@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# httpx: only the tests import it (openai and mcp bring it in at run time).
+# httpx: only the tests import it (to build fake HTTP errors). openai and mcp use httpx2.
 dev = ["pytest==9.1.1", "pytest-asyncio==1.4.0", "httpx==0.28.1"]
 
 [build-system]

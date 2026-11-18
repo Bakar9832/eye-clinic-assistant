@@ -1,0 +1,81 @@
+# Render Blueprint: the clinic API and the Python agent, on Render's free plan.
+# Both in Singapore, next to the Supabase database (ap-southeast-1): every booking
+# makes dozens of queries, and from far away each one costs a ~200 ms round trip.
+# Values marked `sync: false` are secrets you paste in Render's dashboard; see
+# docs/deployment.md for each one.
+
+services:
+  - type: web
+    name: eye-clinic-api
+    runtime: node
+    region: singapore
+    plan: free
+    rootDir: api
+    # Dev dependencies are needed to build (Nest CLI, TypeScript) and, at start, for
+    # `prisma migrate deploy`. The Prisma client is generated explicitly: npm may skip
+    # install scripts.
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build
+    # Migrations run on every start; `deploy` only applies ones not yet applied.
+    startCommand: npx prisma migrate deploy && node dist/main.js
+    healthCheckPath: /clinic
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: NODE_ENV
+        value: production
+      # Vercel's proxy, then Render's: two hops between the visitor and the API.
+      - key: TRUST_PROXY_HOPS
+        value: "2"
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: AGENT_TOKEN_SECRET
+        generateValue: true
+      # The same value as the agent's AGENT_SERVICE_KEY.
+      - key: AGENT_SERVICE_KEY
+        sync: false
+      # The agent's Render URL, e.g. https://eye-clinic-agent.onrender.com
+      - key: AGENT_URL
+        sync: false
+      - key: DEMO_MODE
+        value: "false"
+      # No email provider on the demo: emails are written to the API's log instead.
+      - key: SMTP_HOST
+        value: ""
+      - key: EMAIL_FROM
+        value: "Demo Eye Clinic <no-reply@clinic.example>"
+      # Reminders would only go to made-up addresses.
+      - key: NOTIFICATIONS_EVERY_SECONDS
+        value: "0"
+      - key: RETENTION_EVERY_HOURS
+        value: "24"
+
+  - type: web
+    name: eye-clinic-agent
+    runtime: python
+    region: singapore
+    plan: free
+    rootDir: agent
+    buildCommand: pip install .
+    startCommand: uvicorn eye_agent.app:create_app --factory --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.14.3"
+      - key: LLM_BASE_URL
+        value: "https://generativelanguage.googleapis.com/v1beta/openai/"
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: gemini-3.1-flash-lite
+      - key: LLM_REASONING_EFFORT
+        value: none
+      - key: LLM_TIMEOUT_SECONDS
+        value: "60"
+      # The same value as the API's AGENT_SERVICE_KEY.
+      - key: AGENT_SERVICE_KEY
+        sync: false
+      # The API's Render URL, e.g. https://eye-clinic-api.onrender.com
+      - key: CLINIC_API_URL
+        sync: false

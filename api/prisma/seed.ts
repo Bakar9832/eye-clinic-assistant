@@ -5,9 +5,13 @@
 import path from 'node:path';
 import { config } from 'dotenv';
 import { DateTime } from 'luxon';
-import { createPrismaClient } from '../src/prisma/create-client.js';
+import { AuditService } from '../src/audit/audit.service.js';
+import { AvailabilityService } from '../src/availability/availability.service.js';
+import { BookingService } from '../src/booking/booking.service.js';
 import { generateReference } from '../src/booking/reference.js';
-import { BILAL_DAYS, MON_FRI, seedClinic } from './clinic-data.js';
+import { SystemClock } from '../src/clock.js';
+import { createPrismaClient } from '../src/prisma/create-client.js';
+import { BILAL_DAYS, hours, MON_FRI, seedClinic } from './clinic-data.js';
 
 config({ path: path.resolve(import.meta.dirname, '..', '..', '.env') });
 
@@ -22,7 +26,7 @@ const prisma = createPrismaClient(process.env.DATABASE_URL!);
 const clinicTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 /** Next date (after today, in clinic time) that falls on one of the given weekdays. */
-function nextDay(weekdays: number[], after = DateTime.now().setZone(clinicTimezone)): DateTime {
+function nextDay(weekdays: number[], after: DateTime = DateTime.now().setZone(clinicTimezone)): DateTime {
   let day = after.startOf('day').plus({ days: 1 });
   while (!weekdays.includes(day.weekday)) day = day.plus({ days: 1 });
   return day;
@@ -122,7 +126,58 @@ async function main() {
     },
   });
 
-  console.log(`Seeded clinic (timezone ${clinicTimezone}).`);
+  const booked = await seedBusierCalendar();
+  console.log(`Seeded clinic (timezone ${clinicTimezone}), plus a third doctor and ${booked} bookings for other patients.`);
+}
+
+/**
+ * Demo only (the tests use seedClinic alone): a third doctor and more made-up patients
+ * with bookings over the next two weeks, so the calendar looks like a working clinic.
+ * Booked through BookingService, so every booking follows the real rules.
+ */
+async function seedBusierCalendar() {
+  const hamza = await prisma.resource.create({
+    data: { kind: 'OPTOMETRIST', displayName: 'Dr Hamza', skills: [], workingHours: { create: hours(MON_FRI, '09:00', '17:00') } },
+  });
+  await prisma.staffUser.create({ data: { email: 'dr.hamza@clinic.example', displayName: 'Dr Hamza', role: 'DOCTOR', resourceId: hamza.id } });
+
+  // example.com is reserved for documentation: these can never be real inboxes.
+  const people = [
+    ['Amna Rashid', 'amna.rashid@example.com', '1978-03-11'],
+    ['Bilal Ahmed', 'bilal.ahmed@example.com', '1992-11-02'],
+    ['Farah Khan', 'farah.khan@example.com', '1965-07-23'],
+    ['Omar Siddiqui', 'omar.siddiqui@example.com', '2001-01-30'],
+    ['Zainab Ali', 'zainab.ali@example.com', '1988-05-17'],
+  ] as const;
+  const patients = [];
+  for (const [fullName, email, dateOfBirth] of people) {
+    patients.push(await prisma.patient.create({ data: { fullName, email, dateOfBirth: new Date(dateOfBirth) } }));
+  }
+
+  const clock = new SystemClock();
+  const availability = new AvailabilityService(prisma);
+  const booking = new BookingService(prisma, availability, new AuditService(prisma, clock));
+  const plan = ['ROUTINE_EYE_TEST', 'FOLLOW_UP', 'ROUTINE_EYE_TEST_WITH_SCAN', 'CONTACT_LENS_FITTING', 'FOLLOW_UP'];
+
+  // Two bookings each, on different days: one in the coming week, one in the week after.
+  let made = 0;
+  let day = nextDay(MON_FRI);
+  for (let round = 0; round < 2; round++) {
+    for (const [i, patient] of patients.entries()) {
+      const typeCode = plan[(i + round) % plan.length];
+      for (let tries = 0; tries < 5; tries++, day = nextDay(MON_FRI, day)) {
+        const { slots } = await availability.getSlots({ typeCode, day: day.toISODate()!, now: clock.now() });
+        // A spread of times, not always the first free one.
+        const slot = slots[(i * 7 + round * 3) % Math.max(slots.length, 1)];
+        if (!slot) continue;
+        await booking.book(patient.id, { typeCode, start: slot.start }, clock.now());
+        made++;
+        day = nextDay(MON_FRI, day);
+        break;
+      }
+    }
+  }
+  return made;
 }
 
 main()
