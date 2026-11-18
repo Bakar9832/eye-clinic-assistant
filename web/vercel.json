@@ -4,13 +4,13 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/auth/:path*", "destination": "https://eye-clinic-api.onrender.com/auth/:path*" },
-    { "source": "/me/:path*", "destination": "https://eye-clinic-api.onrender.com/me/:path*" },
-    { "source": "/chat/:path*", "destination": "https://eye-clinic-api.onrender.com/chat/:path*" },
-    { "source": "/clinic/:path*", "destination": "https://eye-clinic-api.onrender.com/clinic/:path*" },
-    { "source": "/availability/:path*", "destination": "https://eye-clinic-api.onrender.com/availability/:path*" },
-    { "source": "/appointment-types/:path*", "destination": "https://eye-clinic-api.onrender.com/appointment-types/:path*" },
-    { "source": "/staff/:path*", "destination": "https://eye-clinic-api.onrender.com/staff/:path*" },
+    { "source": "/auth/:path*", "destination": "https://eye-clinic-api-3frf.onrender.com/auth/:path*" },
+    { "source": "/me/:path*", "destination": "https://eye-clinic-api-3frf.onrender.com/me/:path*" },
+    { "source": "/chat/:path*", "destination": "https://eye-clinic-api-3frf.onrender.com/chat/:path*" },
+    { "source": "/clinic/:path*", "destination": "https://eye-clinic-api-3frf.onrender.com/clinic/:path*" },
+    { "source": "/availability/:path*", "destination": "https://eye-clinic-api-3frf.onrender.com/availability/:path*" },
+    { "source": "/appointment-types/:path*", "destination": "https://eye-clinic-api-3frf.onrender.com/appointment-types/:path*" },
+    { "source": "/staff/:path*", "destination": "https://eye-clinic-api-3frf.onrender.com/staff/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

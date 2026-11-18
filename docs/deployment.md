@@ -50,8 +50,8 @@ Remove-Item Env:DATABASE_URL
 
 1. Vercel → **Add New → Project** → the same repo, **Root Directory `web`**. `web/vercel.json`
    sets the build (`npm run build`, output `dist`).
-2. If Render gave the API a URL other than `https://eye-clinic-api.onrender.com`, replace
-   that address in `web/vercel.json` (seven lines) and push.
+2. Render adds a suffix when a name is taken (this demo got `https://eye-clinic-api-3frf.onrender.com`). Put the API's real URL
+   in `web/vercel.json` (seven lines) and push.
 3. The web app has no environment variables: it only talks to its own site.
 
 ## Environment variables
