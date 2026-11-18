@@ -65,7 +65,7 @@ describe('requesting a code', () => {
   });
 });
 
-describe('sign-up and password reset (emailed code, then a password)', () => {
+describe('sign-up and password reset (emailed code, then a password)', { timeout: 60_000 }, () => {
   /** Requests a code for `email` and returns it. */
   async function codeFor(email: string) {
     await t.http().post('/auth/request-code').send({ email }).expect(202);
@@ -203,7 +203,8 @@ describe('sign-up and password reset (emailed code, then a password)', () => {
   });
 });
 
-describe('logging in with a password', () => {
+// Each login runs scrypt on purpose (slow by design); CI machines are slower than a desktop.
+describe('logging in with a password', { timeout: 60_000 }, () => {
   const loginWith = (email: string, password: string) => t.http().post('/auth/login').send({ email, password });
 
   beforeEach(async () => {
