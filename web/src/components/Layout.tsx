@@ -102,9 +102,6 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
-      <footer className="shrink-0 border-t py-1.5 text-center text-xs text-slate-500">
-        Demo project with made-up data only. Not a real clinic, and nothing here is medical advice.
-      </footer>
     </div>
   );
 }

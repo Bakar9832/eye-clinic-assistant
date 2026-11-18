@@ -161,7 +161,7 @@ describe('yearly check-up reminder', () => {
     await notifications.runOnce(local('2027-10-27', '09:00'));
 
     expect(inbox.sent.map((e) => e.subject)).toEqual(['Time for your yearly eye check-up']);
-    expect(inbox.sent[0].text).toContain('Your last routine eye test at Demo Eye Clinic was on 26 October 2026.');
+    expect(inbox.sent[0].text).toContain('Your last routine eye test at Eye Clinic was on 26 October 2026.');
   });
 
   it('A2. not when the next one is already booked, nor after a visit type that is not yearly', async () => {
@@ -201,7 +201,7 @@ describe('glasses ready', () => {
     await notifications.runOnce(local('2026-11-02', '12:02'));
 
     expect(inbox.sent.map((e) => e.subject)).toEqual(['Your glasses are ready to collect']);
-    expect(inbox.sent[0].text).toContain('Your new glasses are ready to collect from Demo Eye Clinic.');
+    expect(inbox.sent[0].text).toContain('Your new glasses are ready to collect from Eye Clinic.');
     expect(inbox.sent[0].text).toContain(exam.reference);
     expect(inbox.sent[0].text).not.toMatch(/prescription|reading easier|NEW_PRESCRIPTION/i);
   });

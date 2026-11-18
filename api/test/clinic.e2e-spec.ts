@@ -39,7 +39,7 @@ describe('GET /clinic', () => {
   it("tells the page the clinic's name and time zone, without login", async () => {
     const res = await request(app.getHttpServer()).get('/clinic').expect(200);
     expect(res.body).toEqual({
-      name: 'Demo Eye Clinic',
+      name: 'Eye Clinic',
       timezone: ZONE,
       slotGridMin: 15,
       doctors: [

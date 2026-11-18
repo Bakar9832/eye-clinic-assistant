@@ -47,9 +47,6 @@ export function AdminLoginPage() {
         <button className="w-full rounded bg-slate-800 py-2 text-white">Log in</button>
       </form>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      <p className="text-xs text-slate-500">
-        Demo accounts: dr.ayesha@clinic.example, reception@clinic.example, admin@clinic.example. Passwords are set by the clinic's admin.
-      </p>
     </div>
   );
 }

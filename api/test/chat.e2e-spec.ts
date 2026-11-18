@@ -31,7 +31,7 @@ describe('a chat turn', () => {
     expect(turn.messages).toEqual([{ role: 'user', text: 'When are you open?' }]);
     // The harness clock starts at 2030-01-01 05:00 UTC = 10:00 on a Tuesday in Karachi.
     expect(turn.context).toEqual({
-      clinicName: 'Demo Eye Clinic',
+      clinicName: 'Eye Clinic',
       clinicTimezone: 'Asia/Karachi',
       today: '2030-01-01',
       weekday: 'Tuesday',

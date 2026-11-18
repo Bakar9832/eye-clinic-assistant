@@ -17,7 +17,6 @@ function loginApi(answers: { login?: Answer; setPassword?: Answer } = {}) {
     'POST /auth/login': succeed(answers.login),
     'POST /auth/request-code': { status: 202, body: { message: 'sent' } },
     'POST /auth/set-password': succeed(answers.setPassword),
-    'POST /auth/demo': succeed(),
     'POST /chat': { body: { conversationId: 'c', reply: 'Hi', cards: [] } },
   });
   return api;
@@ -114,16 +113,6 @@ describe('logging in', () => {
     expect(api.calls.some((c) => c.path === '/auth/set-password')).toBe(false);
   });
 
-  it('W6. "Try as demo patient" logs in and opens the chat', async () => {
-    const api = loginApi();
-    renderApp('/login');
-
-    await userEvent.click(screen.getByRole('button', { name: 'Try as demo patient' }));
-
-    expect(await screen.findByLabelText('Message')).toBeInTheDocument();
-    expect(await screen.findByText('Demo Patient')).toBeInTheDocument();
-    expect(api.calls.some((c) => c.method === 'POST' && c.path === '/auth/demo')).toBe(true);
-  });
 });
 
 describe('W7. finding your details', () => {

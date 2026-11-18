@@ -15,7 +15,7 @@ const linkClass = 'text-sm text-brand-700 underline-offset-2 hover:underline';
 
 /**
  * Log in with email + password. Creating an account and resetting a password share one
- * flow: email → a 6-digit code is emailed → the code and a new password → logged in.
+ * flow: email â†’ a 6-digit code is emailed â†’ the code and a new password â†’ logged in.
  */
 export function LoginPage() {
   const { refreshMe } = useApp();
@@ -87,12 +87,6 @@ export function LoginPage() {
       await loggedIn(next);
     });
   };
-
-  const demo = () =>
-    run(async () => {
-      await api('/auth/demo', { method: 'POST' });
-      await loggedIn('/');
-    });
 
   const emailField = (
     <label className="block">
@@ -182,7 +176,6 @@ export function LoginPage() {
           {mode === 'signup' && (
             <fieldset className="space-y-3 rounded border border-slate-200 p-3">
               <legend className="px-1 text-sm text-slate-600">Your details (needed to book)</legend>
-              <p className="text-xs text-slate-500">This is a demo: please use a made-up name and date of birth.</p>
               <label className="block">
                 <span className="text-sm">Full name</span>
                 <input autoComplete="name" required maxLength={100} value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} />
@@ -213,13 +206,6 @@ export function LoginPage() {
           {error}
         </p>
       )}
-
-      <div className="border-t pt-6 text-center">
-        <p className="mb-2 text-sm text-slate-600">Just looking around?</p>
-        <button onClick={demo} disabled={busy} className="rounded border border-brand-600 px-4 py-2 text-brand-700 disabled:opacity-50">
-          Try as demo patient
-        </button>
-      </div>
     </div>
   );
 }

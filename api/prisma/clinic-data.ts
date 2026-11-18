@@ -40,7 +40,7 @@ export async function seedClinic(prisma: PrismaClient, timezone: string) {
   await prisma.clinicSetting.create({
     data: {
       id: 1,
-      name: 'Demo Eye Clinic',
+      name: 'Eye Clinic',
       timezone,
       slotGridMin: 15,
       offerRecheckAfterNewPrescription: false,

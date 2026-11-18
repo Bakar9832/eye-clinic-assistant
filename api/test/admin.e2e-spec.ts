@@ -74,7 +74,7 @@ describe('E1. clinic settings', () => {
   it('admins can read the current settings; reception cannot', async () => {
     const res = await (await admin()).get('/staff/settings').expect(200);
     expect(res.body).toEqual({
-      name: 'Demo Eye Clinic',
+      name: 'Eye Clinic',
       timezone: ZONE,
       slotGridMin: 15,
       offerRecheckAfterNewPrescription: false,

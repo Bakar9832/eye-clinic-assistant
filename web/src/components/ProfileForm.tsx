@@ -26,7 +26,7 @@ export function ProfileForm({ onSaved }: { onSaved?: () => void }) {
 
   return (
     <form onSubmit={submit} aria-label="Your details" className="space-y-3 rounded-lg border bg-white p-4">
-      <p className="text-sm text-slate-600">Before your first booking we need your name and date of birth. Please use made-up details: this is a demo.</p>
+      <p className="text-sm text-slate-600">Before your first booking we need your name and date of birth.</p>
       <label className="block">
         <span className="text-sm">Full name</span>
         <input required value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1 w-full rounded border border-slate-300 px-2 py-1" />
