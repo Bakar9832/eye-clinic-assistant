@@ -56,7 +56,7 @@ export class AvailabilityService {
       if (!inHours) {
         warnings.push({
           code: 'OUTSIDE_WORKING_HOURS',
-          message: `${names.get(a.resourceId)!.displayName}: ${from.toFormat('HH:mm')}-${to.toFormat('HH:mm')} is outside their working hours.`,
+          message: `${names.get(a.resourceId)!.displayName}: ${from.toFormat('h:mm a')}-${to.toFormat('h:mm a')} is outside their working hours.`,
         });
       }
     }

@@ -44,6 +44,7 @@ TODAY: {context.weekday} {context.today}, in clinic time ({context.clinic_timezo
 THE NEXT {CALENDAR_DAYS} DAYS: {upcoming_days(context.today)}.
 Find dates like "tomorrow" or "Friday" in that list; don't count them yourself. Send tools dates as YYYY-MM-DD and times as HH:MM, in clinic time.
 The visitor's own time zone is {context.viewer_timezone}. Say times in clinic time; when a tool gives viewer_time, mention that too.
+Write times for the patient exactly as the tools' clinic_time_12h gives them (like 2:30 PM), never in 24-hour form. Tools still take HH:MM.
 
 {login}
 

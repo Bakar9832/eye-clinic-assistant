@@ -471,9 +471,12 @@ export class ClinicToolsService {
     const viewer = DateTime.fromJSDate(at, { zone: viewerZone });
     return {
       date: clinic.toISODate(),
+      // 24-hour, for sending back to tools.
       clinic_time: clinic.toFormat('HH:mm'),
-      // Only when it differs: "10:00 clinic time · 06:00 your time".
-      ...(viewer.offset !== clinic.offset ? { viewer_time: viewer.toFormat('ccc d LLL HH:mm') } : {}),
+      // What the patient sees ("2:30 PM"), made here so the model never converts times itself.
+      clinic_time_12h: clinic.toFormat('h:mm a'),
+      // Only when it differs: "10:00 AM clinic time · Mon 7 Jan 5:00 AM your time".
+      ...(viewer.offset !== clinic.offset ? { viewer_time: viewer.toFormat('ccc d LLL h:mm a') } : {}),
     };
   }
 

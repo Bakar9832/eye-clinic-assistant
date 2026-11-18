@@ -10,9 +10,14 @@ export function zoneLabel(zone: string): string {
   return (zone.split('/').at(-1) ?? zone).replaceAll('_', ' ');
 }
 
+/** 12-hour with AM/PM ("2:30 PM"): what patients read most easily. */
+export const TIME = 'h:mm a';
+
 interface TimeDisplay {
-  /** Clinic time, e.g. "Mon 7 Jan 10:00". The visit happens there, so this always shows. */
+  /** Clinic time, e.g. "Mon 7 Jan 10:00 AM". The visit happens there, so this always shows. */
   clinic: string;
+  /** Just the clinic time, e.g. "10:00 AM" (for slot buttons). */
+  clinicTime: string;
   /** The viewer's time when their zone differs at that moment, else null. */
   viewer: string | null;
   /** The whole thing as one line. */
@@ -20,8 +25,8 @@ interface TimeDisplay {
 }
 
 /**
- * One moment, shown CLAUDE.md's way: "Mon 7 Jan 10:00 clinic time (Karachi) · 06:00 your
- * time (London)", or just the clinic time when both zones agree at that moment.
+ * One moment, shown CLAUDE.md's way: "Mon 7 Jan 10:00 AM clinic time (Karachi) · 5:00 AM
+ * your time (London)", or just the clinic time when both zones agree at that moment.
  *
  * "Agree" is decided per moment: London matches UTC in winter but not in summer.
  * The viewer's day is shown only when it differs from the clinic's (near midnight).
@@ -29,14 +34,16 @@ interface TimeDisplay {
 export function formatTime(iso: string, clinicZone: string, viewerZone: string): TimeDisplay {
   const clinic = DateTime.fromISO(iso, { zone: clinicZone });
   const viewer = DateTime.fromISO(iso, { zone: viewerZone });
-  const clinicText = clinic.toFormat('ccc d LLL HH:mm');
+  const clinicText = clinic.toFormat(`ccc d LLL ${TIME}`);
+  const clinicTime = clinic.toFormat(TIME);
 
-  if (clinic.offset === viewer.offset) return { clinic: clinicText, viewer: null, text: clinicText };
+  if (clinic.offset === viewer.offset) return { clinic: clinicText, clinicTime, viewer: null, text: clinicText };
 
   const sameDay = viewer.toISODate() === clinic.toISODate();
-  const viewerText = viewer.toFormat(sameDay ? 'HH:mm' : 'ccc d LLL HH:mm');
+  const viewerText = viewer.toFormat(sameDay ? TIME : `ccc d LLL ${TIME}`);
   return {
     clinic: clinicText,
+    clinicTime,
     viewer: viewerText,
     text: `${clinicText} clinic time (${zoneLabel(clinicZone)}) · ${viewerText} your time (${zoneLabel(viewerZone)})`,
   };

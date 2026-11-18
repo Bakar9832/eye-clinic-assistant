@@ -42,9 +42,9 @@ describe('the ticket card', () => {
       <TicketCard card={{ type: 'ticket', reference: 'EC-7K3QFM', start: '2030-01-07T05:00:00.000Z', doctor: 'Dr Ayesha', prepInstructions: 'Bring your glasses.' }} />,
     );
 
-    expect(await screen.findByText('Mon 7 Jan 10:00')).toBeInTheDocument();
+    expect(await screen.findByText('Mon 7 Jan 10:00 AM')).toBeInTheDocument();
     expect(screen.getByText('EC-7K3QFM')).toBeInTheDocument();
-    expect(screen.getByLabelText('Booking ticket')).toHaveTextContent('clinic time (Karachi) · 05:00 your time (London)');
+    expect(screen.getByLabelText('Booking ticket')).toHaveTextContent('clinic time (Karachi) · 5:00 AM your time (London)');
     expect(screen.getByText('Bring your glasses.')).toBeInTheDocument();
   });
 });

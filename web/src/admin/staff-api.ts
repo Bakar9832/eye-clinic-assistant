@@ -60,6 +60,6 @@ export function useStaffMe() {
 }
 
 /** Staff work at the clinic, so they see clinic time only. */
-export function clinicTime(iso: string, zone: string, format = 'HH:mm') {
+export function clinicTime(iso: string, zone: string, format = 'h:mm a') {
   return DateTime.fromISO(iso, { zone }).toFormat(format);
 }

@@ -65,7 +65,7 @@ describe('overrides', () => {
 
     expect(res.body.error).toBe('OVERRIDE_REQUIRED');
     expect(res.body.reasons).toEqual([
-      { code: 'OUTSIDE_WORKING_HOURS', message: 'Dr Ayesha: 17:00-17:15 is outside their working hours.' },
+      { code: 'OUTSIDE_WORKING_HOURS', message: 'Dr Ayesha: 5:00 PM-5:15 PM is outside their working hours.' },
     ]);
     expect(await t.prisma.appointment.count()).toBe(0);
   });
@@ -78,7 +78,7 @@ describe('overrides', () => {
     expect(event.details).toEqual({
       override: true,
       reason: REASON,
-      warnings: ['Dr Ayesha: 17:00-17:15 is outside their working hours.'],
+      warnings: ['Dr Ayesha: 5:00 PM-5:15 PM is outside their working hours.'],
     });
   });
 

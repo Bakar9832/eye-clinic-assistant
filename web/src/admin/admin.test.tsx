@@ -72,7 +72,7 @@ describe('A3. the schedule', () => {
     });
     renderApp('/admin');
 
-    const row = await screen.findByRole('listitem', { name: /10:00 Demo Patient/ });
+    const row = await screen.findByRole('listitem', { name: /10:00 AM Demo Patient/ });
     expect(row).toHaveTextContent('Follow-up visit');
     expect(row).toHaveTextContent('Dr Ayesha');
 
@@ -214,7 +214,7 @@ describe('A6b. glasses', () => {
 
 describe('A7. booking with an override', () => {
   it('shows the warnings, needs a real reason, then books anyway with it', async () => {
-    const warning = { code: 'OUTSIDE_WORKING_HOURS', message: 'Dr Ayesha: 17:00-17:15 is outside their working hours.' };
+    const warning = { code: 'OUTSIDE_WORKING_HOURS', message: 'Dr Ayesha: 5:00 PM-5:15 PM is outside their working hours.' };
     const api = staffApi(RECEPTION, {
       'GET /staff/patients': { body: [{ id: 'p2', fullName: 'Test Patient Two', email: 'test.two@example.com' }] },
       'GET /appointment-types': { body: [{ code: 'FOLLOW_UP', name: 'Follow-up visit', typicalMin: 10, calendarMin: 15, isUrgent: false, prepInstructions: '', steps: [] }] },

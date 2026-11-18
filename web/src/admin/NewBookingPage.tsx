@@ -181,7 +181,7 @@ export function NewBookingPage() {
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
       {booked && (
         <p className="rounded bg-emerald-50 p-3 text-emerald-800">
-          Booked {booked.reference} for {clinicTime(booked.start, clinic.timezone, 'ccc d LLL HH:mm')} (clinic time).
+          Booked {booked.reference} for {clinicTime(booked.start, clinic.timezone, 'ccc d LLL h:mm a')} (clinic time).
         </p>
       )}
     </div>

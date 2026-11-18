@@ -11,7 +11,7 @@ export function TimeText({ iso, compact = false }: { iso: string; compact?: bool
     // For slot buttons: just the clinic time, with the viewer's under it if different.
     return (
       <span className="flex flex-col leading-tight">
-        <span>{t.clinic.slice(-5)}</span>
+        <span>{t.clinicTime}</span>
         {t.viewer && <span className="text-xs text-slate-500">{t.viewer} yours</span>}
       </span>
     );

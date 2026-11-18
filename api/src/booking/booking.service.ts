@@ -262,7 +262,7 @@ export class BookingService {
       orderBy: { startsAt: 'asc' },
     });
     if (existing) {
-      const time = DateTime.fromJSDate(existing.startsAt, { zone: timezone }).toFormat('HH:mm');
+      const time = DateTime.fromJSDate(existing.startsAt, { zone: timezone }).toFormat('h:mm a');
       throw new SchedulingError('ALREADY_BOOKED', [
         {
           code: 'ALREADY_BOOKED',

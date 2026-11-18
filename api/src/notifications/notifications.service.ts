@@ -120,7 +120,7 @@ export class NotificationsService {
         appointmentId: a.id,
         email: {
           to: a.patient.email,
-          subject: `Reminder: your ${a.appointmentType.name.toLowerCase()} on ${when.toFormat('cccc d LLLL')} at ${when.toFormat('HH:mm')}`,
+          subject: `Reminder: your ${a.appointmentType.name.toLowerCase()} on ${when.toFormat('cccc d LLLL')} at ${when.toFormat('h:mm a')}`,
           text: [
             `Hello ${a.patient.fullName ?? 'there'},`,
             '',
@@ -229,5 +229,5 @@ type Settings = { name: string; timezone: string; reminderHoursBefore: number; a
 
 /** "Tuesday 15 January 2030, 10:00 clinic time (Asia/Karachi)": no browser to convert it. */
 function clinicTime(when: DateTime, zone: string): string {
-  return `${when.toFormat('cccc d LLLL yyyy, HH:mm')} clinic time (${zone})`;
+  return `${when.toFormat('cccc d LLLL yyyy, h:mm a')} clinic time (${zone})`;
 }

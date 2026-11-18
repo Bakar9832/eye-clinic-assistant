@@ -91,7 +91,7 @@ function OutcomeEditor({ appointmentId, day, existing = false }: { appointmentId
   if (existing && current.data?.editable === false) {
     return (
       <p className="text-sm text-slate-500">
-        This outcome can no longer be corrected: the edit window ended {DateTime.fromISO(current.data.editableUntil!).toFormat('d LLL HH:mm')}.
+        This outcome can no longer be corrected: the edit window ended {DateTime.fromISO(current.data.editableUntil!).toFormat('d LLL h:mm a')}.
       </p>
     );
   }

@@ -287,7 +287,7 @@ describe('T8. availability in clinic time and the viewer\'s time', () => {
     const [day] = data.days as { weekday: string; slots: { clinic_time: string; viewer_time?: string; doctor: string }[] }[];
     expect(day.weekday).toBe('Monday');
     expect(day.slots.map((s) => s.clinic_time)).toEqual(['09:00', '09:15', '09:30', '09:45']);
-    expect(day.slots[0]).toEqual({ date: MON, clinic_time: '09:00', viewer_time: 'Mon 7 Jan 04:00', doctor: 'Dr Ayesha' });
+    expect(day.slots[0]).toEqual({ date: MON, clinic_time: '09:00', clinic_time_12h: '9:00 AM', viewer_time: 'Mon 7 Jan 4:00 AM', doctor: 'Dr Ayesha' });
   });
 
   type NearDay = { requested_time_free: boolean; slots: { clinic_time: string }[]; more: number };

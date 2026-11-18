@@ -30,7 +30,7 @@ export function HandoffsPage() {
         {handoffs.data?.map((h) => (
           <li key={h.id} className="rounded-lg border bg-white p-3">
             <div className="flex flex-wrap items-baseline gap-x-3 text-sm text-slate-500">
-              <span>{clinic ? clinicTime(h.createdAt, clinic.timezone, 'ccc d LLL HH:mm') : ''}</span>
+              <span>{clinic ? clinicTime(h.createdAt, clinic.timezone, 'ccc d LLL h:mm a') : ''}</span>
               <span>{h.patient ? `${h.patient.fullName ?? '(no name)'} · ${h.patient.email}` : 'Guest (not logged in)'}</span>
             </div>
             <p className="my-1">{h.reason}</p>

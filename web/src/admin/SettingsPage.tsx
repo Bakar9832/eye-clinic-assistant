@@ -36,7 +36,7 @@ function AffectedList({ bookings, title }: { bookings: Affected[]; title: string
       <ul className="list-disc pl-5">
         {bookings.map((b) => (
           <li key={b.reference + b.resource}>
-            {b.reference} · {clinic ? clinicTime(b.start, clinic.timezone, 'ccc d LLL HH:mm') : b.start} · {b.patient ?? '(no name)'} · {b.resource}
+            {b.reference} · {clinic ? clinicTime(b.start, clinic.timezone, 'ccc d LLL h:mm a') : b.start} · {b.patient ?? '(no name)'} · {b.resource}
           </li>
         ))}
       </ul>

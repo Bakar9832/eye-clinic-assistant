@@ -264,7 +264,7 @@ describe('One upcoming booking per type and day, for patients', () => {
       (e: unknown) => e,
     )) as SchedulingError;
     expect(error.reasons[0].message).toContain(first.reference);
-    expect(error.reasons[0].message).toContain('09:00');
+    expect(error.reasons[0].message).toContain('9:00 AM');
     expect(await prisma.appointment.count()).toBe(1);
   });
 

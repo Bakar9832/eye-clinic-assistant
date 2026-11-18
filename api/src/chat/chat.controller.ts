@@ -168,7 +168,7 @@ export class ChatController {
     });
     const { timezone } = await clinicSettings(this.prisma);
     const doctor = doctorOf(a);
-    const when = DateTime.fromJSDate(a.startsAt, { zone: timezone }).toFormat('cccc d LLLL, HH:mm');
+    const when = DateTime.fromJSDate(a.startsAt, { zone: timezone }).toFormat('cccc d LLLL, h:mm a');
     const reply = `Booked: ${a.appointmentType.name}, ${when} clinic time${doctor ? ` with ${doctor}` : ''}. Your reference is ${a.reference}.`;
     const cards = [ticketCard(a)];
 

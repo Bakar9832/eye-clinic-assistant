@@ -81,8 +81,8 @@ describe('appointment reminders', () => {
     await notifications.runOnce(before(22));
 
     expect(inbox.sent.map((e) => e.subject)).toEqual([
-      'Reminder: your follow-up visit on Monday 26 October at 10:00',
-      'Reminder: your follow-up visit on Monday 26 October at 11:00',
+      'Reminder: your follow-up visit on Monday 26 October at 10:00 AM',
+      'Reminder: your follow-up visit on Monday 26 October at 11:00 AM',
     ]);
   });
 
@@ -103,7 +103,7 @@ describe('appointment reminders', () => {
     await notifications.runOnce(before(23));
 
     const { text } = inbox.sent[0];
-    expect(text).toContain('When: Monday 26 October 2026, 10:00 clinic time (Asia/Karachi)');
+    expect(text).toContain('When: Monday 26 October 2026, 10:00 AM clinic time (Asia/Karachi)');
     expect(text).toContain(`Reference: ${appointment.reference}`);
     expect(text).toContain('What: Follow-up visit with Dr ');
     expect(text).toContain('Preparation: Bring your current glasses or contact lenses.');
