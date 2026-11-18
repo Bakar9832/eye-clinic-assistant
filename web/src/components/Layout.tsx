@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { api } from '../api/client';
 import { useApp } from '../app-context';
 import { ZoneSelect } from './ZoneSelect';
@@ -45,9 +45,15 @@ export function Layout() {
             <ZoneSelect />
             {me ? (
               <span className="flex items-center gap-3 text-sm">
-                <Link to="/profile" className="text-slate-600 hover:text-brand-700">
-                  {me.fullName ?? me.email}
-                </Link>
+                <span className="text-slate-600">{me.fullName ?? me.email}</span>
+                <NavLink
+                  to="/profile"
+                  className={({ isActive }) =>
+                    `rounded border px-2 py-0.5 ${isActive ? 'border-brand-600 text-brand-700' : 'border-slate-300 text-slate-700 hover:border-brand-600 hover:text-brand-700'}`
+                  }
+                >
+                  Your details
+                </NavLink>
                 <button onClick={logout} className="text-slate-500 hover:text-brand-700">
                   Log out
                 </button>
@@ -62,12 +68,30 @@ export function Layout() {
           </div>
         </div>
       </header>
+      <ProfileBanner />
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-6">
         <Outlet />
       </main>
       <footer className="border-t py-3 text-center text-xs text-slate-500">
         Demo project with made-up data only. Not a real clinic, and nothing here is medical advice.
       </footer>
+    </div>
+  );
+}
+
+/** Until a patient has a name and date of birth they can't book or see results, so say so everywhere. */
+function ProfileBanner() {
+  const { me } = useApp();
+  const location = useLocation();
+  if (!me || me.profileComplete || location.pathname === '/profile') return null;
+  return (
+    <div role="status" className="border-b border-amber-200 bg-amber-50">
+      <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-sm text-amber-900">
+        <span>Add your name and date of birth to book appointments or see results.</span>
+        <Link to={`/profile?next=${encodeURIComponent(location.pathname)}`} className="font-medium underline underline-offset-2">
+          Complete your details →
+        </Link>
+      </div>
     </div>
   );
 }

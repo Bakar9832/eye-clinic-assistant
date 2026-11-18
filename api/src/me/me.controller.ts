@@ -6,6 +6,7 @@ import { Clock } from '../clock.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
 import { IsTimezone } from '../http/is-timezone.js';
+import { parseDateOfBirth } from './date-of-birth.js';
 
 class UpdateProfileDto {
   @IsOptional()
@@ -52,10 +53,7 @@ export class MeController {
         'Your date of birth is already set. Please contact the clinic to change it.',
       );
     }
-    const dateOfBirth = body.dateOfBirth === undefined ? undefined : new Date(`${body.dateOfBirth}T00:00:00Z`);
-    if (dateOfBirth && (dateOfBirth > this.clock.now() || dateOfBirth < new Date('1900-01-01T00:00:00Z'))) {
-      throw httpError(HttpStatus.BAD_REQUEST, 'INVALID_INPUT', 'That date of birth is not possible.');
-    }
+    const dateOfBirth = body.dateOfBirth === undefined ? undefined : parseDateOfBirth(body.dateOfBirth, this.clock.now());
 
     const updated = await this.prisma.patient.update({
       where: { id: me.id },

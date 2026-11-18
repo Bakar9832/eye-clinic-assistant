@@ -1,5 +1,5 @@
 import { Transform } from 'class-transformer';
-import { IsEmail, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsEmail, IsISO8601, IsOptional, IsString, Length, Matches, MaxLength, MinLength } from 'class-validator';
 import { PASSWORD_MAX, PASSWORD_MIN } from './password.js';
 
 // Pasted emails often carry spaces; trim before the format check.
@@ -23,6 +23,17 @@ export class SetPasswordDto extends RequestCodeDto {
   @IsString()
   @Length(PASSWORD_MIN, PASSWORD_MAX, { message: `password must be ${PASSWORD_MIN} to ${PASSWORD_MAX} characters` })
   password!: string;
+
+  /** Sign-up asks for these too, so a new patient can book straight away. Same rules as the profile. */
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  fullName?: string;
+
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  @Length(10, 10, { message: 'dateOfBirth must look like 1990-01-15' })
+  dateOfBirth?: string;
 }
 
 /** Patients and staff log in the same way. Any length is accepted here: a wrong one just fails. */

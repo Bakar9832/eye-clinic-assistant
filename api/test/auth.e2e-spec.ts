@@ -73,6 +73,8 @@ describe('sign-up and password reset (emailed code, then a password)', () => {
   }
   const setPassword = (email: string, code: string, password = TEST_PASSWORD) =>
     t.http().post('/auth/set-password').send({ email, code, password });
+  const setPasswordWith = (email: string, code: string, profile: { fullName?: string; dateOfBirth?: string }) =>
+    t.http().post('/auth/set-password').send({ email, code, password: TEST_PASSWORD, ...profile });
 
   it('A3. sign-up: the right code and a password set an HttpOnly, SameSite=Lax session cookie that works', async () => {
     const browser = t.browser();
@@ -155,6 +157,37 @@ describe('sign-up and password reset (emailed code, then a password)', () => {
     await laptop.get('/me').expect(401);
     await t.http().post('/auth/login').send({ email: DEMO, password: TEST_PASSWORD }).expect(401);
     await t.http().post('/auth/login').send({ email: DEMO, password: 'brand-new-password' }).expect(200);
+  });
+
+  it('PW16. sign-up can include name and date of birth, so the profile is complete at once', async () => {
+    const code = await codeFor(NEW_PERSON);
+    const browser = t.browser();
+    await browser
+      .post('/auth/set-password')
+      .send({ email: NEW_PERSON, code, password: TEST_PASSWORD, fullName: '  New Person ', dateOfBirth: '1992-03-04' })
+      .expect(200);
+
+    const me = (await browser.get('/me').expect(200)).body;
+    expect(me).toMatchObject({ fullName: 'New Person', hasDateOfBirth: true, profileComplete: true });
+    expect(JSON.stringify(me)).not.toContain('1992');
+  });
+
+  it('PW17. a reset never replaces an existing name or date of birth (they guard results)', async () => {
+    const code = await codeFor(DEMO); // the seeded demo patient: name and date of birth already set
+    await setPasswordWith(DEMO, code, { fullName: 'Someone Else', dateOfBirth: '2001-01-01' }).expect(200);
+
+    const demo = await t.prisma.patient.findUniqueOrThrow({ where: { email: DEMO } });
+    expect(demo.fullName).toBe('Demo Patient');
+    expect(demo.dateOfBirth?.toISOString().slice(0, 10)).toBe('1990-01-15');
+  });
+
+  it('PW18. an impossible date of birth is refused, and the code still works afterwards', async () => {
+    const code = await codeFor(NEW_PERSON);
+    const res = await setPasswordWith(NEW_PERSON, code, { fullName: 'New Person', dateOfBirth: '2999-01-01' }).expect(400);
+    expect(res.body.error).toBe('INVALID_INPUT');
+    expect(await t.prisma.patient.count({ where: { email: NEW_PERSON } })).toBe(0);
+
+    await setPasswordWith(NEW_PERSON, code, { fullName: 'New Person', dateOfBirth: '1992-03-04' }).expect(200);
   });
 
   it('A13. email case and spaces don\'t matter: same person, same account', async () => {

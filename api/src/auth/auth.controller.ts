@@ -19,7 +19,7 @@ export class AuthController {
   @Post('set-password')
   @HttpCode(HttpStatus.OK)
   async setPassword(@Body() body: SetPasswordDto, @Ip() ip: string, @Res({ passthrough: true }) res: Response) {
-    setSessionCookie(res, await this.auth.setPassword(body.email, body.code, body.password, ip));
+    setSessionCookie(res, await this.auth.setPassword(body.email, body.code, body.password, ip, body));
     return { loggedIn: true };
   }
 

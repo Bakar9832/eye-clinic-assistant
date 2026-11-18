@@ -68,6 +68,8 @@ describe('logging in', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
     await userEvent.type(await screen.findByLabelText('Code'), '123456');
     await userEvent.type(screen.getByLabelText(/Choose a password/), 'a-new-password');
+    await userEvent.type(screen.getByLabelText('Full name'), 'New Person');
+    await userEvent.type(screen.getByLabelText('Date of birth'), '1992-03-04');
     await userEvent.click(within(card()).getByRole('button', { name: 'Create account' }));
 
     expect(await screen.findByRole('button', { name: 'Log out' })).toBeInTheDocument();
@@ -76,6 +78,8 @@ describe('logging in', () => {
       email: 'new.person@example.com',
       code: '123456',
       password: 'a-new-password',
+      fullName: 'New Person',
+      dateOfBirth: '1992-03-04',
     });
   });
 
@@ -88,6 +92,7 @@ describe('logging in', () => {
     await userEvent.type(screen.getByLabelText('Email'), 'demo.patient@example.com');
     await userEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
     await userEvent.type(await screen.findByLabelText('Code'), '000000');
+    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument(); // a reset doesn't ask again
     await userEvent.type(screen.getByLabelText(/New password/), 'another-password');
     await userEvent.click(screen.getByRole('button', { name: 'Save new password' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('wrong or has expired');
@@ -101,6 +106,8 @@ describe('logging in', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
     await userEvent.type(await screen.findByLabelText('Code'), '123456');
     await userEvent.type(screen.getByLabelText(/Choose a password/), 'short');
+    await userEvent.type(screen.getByLabelText('Full name'), 'New Person');
+    await userEvent.type(screen.getByLabelText('Date of birth'), '1992-03-04');
     await userEvent.click(within(card()).getByRole('button', { name: 'Create account' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('at least 8 characters');
@@ -116,6 +123,43 @@ describe('logging in', () => {
     expect(await screen.findByLabelText('Message')).toBeInTheDocument();
     expect(await screen.findByText('Demo Patient')).toBeInTheDocument();
     expect(api.calls.some((c) => c.method === 'POST' && c.path === '/auth/demo')).toBe(true);
+  });
+});
+
+describe('W7. finding your details', () => {
+  const INCOMPLETE = { ...DEMO, fullName: null, hasDateOfBirth: false, profileComplete: false };
+
+  it('the header has a visible "Your details" link to the profile', async () => {
+    mockApi({ 'GET /me': { body: DEMO } });
+    renderApp('/');
+    expect(await screen.findByRole('link', { name: 'Your details' })).toHaveAttribute('href', '/profile');
+  });
+
+  it('an incomplete profile shows a banner on every page, linking to the profile and back', async () => {
+    const api = mockApi({
+      'GET /me': () => ({ body: api.calls.some((c) => c.method === 'PATCH') ? DEMO : INCOMPLETE }),
+      'PATCH /me': { body: DEMO },
+      'GET /me/appointments': { body: [] },
+    });
+    renderApp('/my');
+
+    const link = await screen.findByRole('link', { name: /Complete your details/ });
+    expect(screen.getByRole('status')).toHaveTextContent('Add your name and date of birth');
+    await userEvent.click(link);
+
+    await userEvent.type(await screen.findByLabelText('Full name'), 'Demo Patient');
+    await userEvent.type(screen.getByLabelText('Date of birth'), '1990-01-15');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByRole('heading', { name: /appointments/i })).toBeInTheDocument(); // back on /my
+    expect(screen.queryByRole('link', { name: /Complete your details/ })).not.toBeInTheDocument();
+  });
+
+  it('a complete profile shows no banner', async () => {
+    mockApi({ 'GET /me': { body: DEMO } });
+    renderApp('/');
+    await screen.findByRole('link', { name: 'Your details' });
+    expect(screen.queryByRole('link', { name: /Complete your details/ })).not.toBeInTheDocument();
   });
 });
 

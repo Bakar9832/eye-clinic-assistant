@@ -28,6 +28,8 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -79,7 +81,9 @@ export function LoginPage() {
       return;
     }
     void run(async () => {
-      await api('/auth/set-password', { method: 'POST', body: { email, code, password } });
+      // Sign-up also sends name and date of birth, so a new patient can book straight away.
+      const profile = mode === 'signup' ? { fullName, dateOfBirth } : {};
+      await api('/auth/set-password', { method: 'POST', body: { email, code, password, ...profile } });
       await loggedIn(next);
     });
   };
@@ -175,6 +179,20 @@ export function LoginPage() {
             />
             <span className="text-xs text-slate-500">At least {PASSWORD_MIN} characters.</span>
           </label>
+          {mode === 'signup' && (
+            <fieldset className="space-y-3 rounded border border-slate-200 p-3">
+              <legend className="px-1 text-sm text-slate-600">Your details (needed to book)</legend>
+              <p className="text-xs text-slate-500">This is a demo: please use a made-up name and date of birth.</p>
+              <label className="block">
+                <span className="text-sm">Full name</span>
+                <input autoComplete="name" required maxLength={100} value={fullName} onChange={(e) => setFullName(e.target.value)} className={inputClass} />
+              </label>
+              <label className="block">
+                <span className="text-sm">Date of birth</span>
+                <input type="date" required value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} className={inputClass} />
+              </label>
+            </fieldset>
+          )}
           <button disabled={busy} className={primaryClass}>
             {mode === 'signup' ? 'Create account' : 'Save new password'}
           </button>

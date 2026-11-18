@@ -5,6 +5,7 @@ import { Clock } from '../clock.js';
 import { requireEnv } from '../config.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
+import { parseDateOfBirth } from '../me/date-of-birth.js';
 import { EmailSender } from '../notifications/email-sender.js';
 import { DUMMY_HASH, hashPassword, verifyPassword } from './password.js';
 
@@ -112,8 +113,16 @@ export class AuthService {
    * Sign-up and password reset: the emailed code proves the inbox, then the password is set.
    * The first time creates the patient. A reset logs out every other session, so whoever
    * knew the old password is out.
+   * `profile` (sign-up): fills a missing name or date of birth, never replaces one. The date of
+   * birth guards results, so knowing a code must not let anyone change an existing one.
    */
-  async setPassword(rawEmail: string, code: string, password: string, ip: string | undefined): Promise<NewSession> {
+  async setPassword(
+    rawEmail: string,
+    code: string,
+    password: string,
+    ip: string | undefined,
+    profile: { fullName?: string; dateOfBirth?: string } = {},
+  ): Promise<NewSession> {
     const email = normaliseEmail(rawEmail);
     const now = this.clock.now();
     const invalid = () => httpError(HttpStatus.UNAUTHORIZED, 'INVALID_CODE', 'That code is wrong or has expired.');
@@ -132,7 +141,10 @@ export class AuthService {
       throw invalid();
     }
 
-    // Hashed before the code is used up, so a slow hash can't leave a spent code and no password.
+    // Checked and hashed before the code is used up, so a bad date or a slow hash can't
+    // leave a spent code and no password.
+    const dateOfBirth = profile.dateOfBirth === undefined ? undefined : parseDateOfBirth(profile.dateOfBirth, now);
+    const fullName = profile.fullName?.trim() || undefined;
     const passwordHash = await hashPassword(password);
 
     // Conditional update: if the same code is submitted twice at once, only one wins.
@@ -142,8 +154,16 @@ export class AuthService {
     });
     if (count === 0) throw invalid();
 
-    const before = await this.prisma.patient.findUnique({ where: { email }, select: { passwordHash: true } });
-    const patient = await this.prisma.patient.upsert({ where: { email }, create: { email, passwordHash }, update: { passwordHash } });
+    const before = await this.prisma.patient.findUnique({ where: { email }, select: { passwordHash: true, fullName: true, dateOfBirth: true } });
+    const patient = await this.prisma.patient.upsert({
+      where: { email },
+      create: { email, passwordHash, fullName, dateOfBirth },
+      update: {
+        passwordHash,
+        ...(before?.fullName ? {} : { fullName }),
+        ...(before?.dateOfBirth ? {} : { dateOfBirth }),
+      },
+    });
     const reset = Boolean(before?.passwordHash);
     if (reset) {
       await this.prisma.session.updateMany({ where: { patientId: patient.id, revokedAt: null }, data: { revokedAt: now } });
