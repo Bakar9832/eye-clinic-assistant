@@ -27,6 +27,37 @@ describe('the chat', () => {
     expect(chats[1].body).toEqual({ message: 'Book me in', viewerTimezone: 'Europe/London', conversationId: 'conv-1' });
   });
 
+  it('W7b. a quick action sends its message; guests only see the ones that work without logging in', async () => {
+    const api = mockApi({ 'POST /chat': { body: { conversationId: 'c', reply: 'Sure.', cards: [] } } });
+    renderApp('/');
+
+    // jsdom ignores the CSS that shows one set per screen size, so both sets are present.
+    const book = await screen.findAllByRole('button', { name: 'Book an eye test' });
+    expect(screen.queryByRole('button', { name: 'Are my results in?' })).not.toBeInTheDocument();
+    await userEvent.click(book[0]);
+
+    expect(await screen.findByText('Sure.')).toBeInTheDocument();
+    expect(api.calls.find((c) => c.path === '/chat')?.body).toMatchObject({ message: "I'd like to book a routine eye test." });
+  });
+
+  it('W7c. logged in, the side panel shows the next booked visit', async () => {
+    mockApi({
+      'GET /me': { body: DEMO },
+      'GET /me/appointments': {
+        body: [
+          { id: 'a1', reference: 'EC-NEXT01', status: 'BOOKED', start: '2099-01-05T05:00:00.000Z', end: '2099-01-05T05:30:00.000Z', type: { code: 'ROUTINE_EYE_TEST', name: 'Routine eye test', typicalMin: 25 }, doctor: { displayName: 'Dr Ayesha' }, prepInstructions: '' },
+          { id: 'a2', reference: 'EC-OLD001', status: 'COMPLETED', start: '2020-01-05T05:00:00.000Z', end: '2020-01-05T05:30:00.000Z', type: { code: 'FOLLOW_UP', name: 'Follow-up visit', typicalMin: 15 }, doctor: null, prepInstructions: '' },
+        ],
+      },
+    });
+    renderApp('/');
+
+    expect(await screen.findByText('EC-NEXT01')).toBeInTheDocument();
+    expect(screen.getByText('with Dr Ayesha')).toBeInTheDocument();
+    expect(screen.queryByText('EC-OLD001')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Are my results in?' }).length).toBeGreaterThan(0);
+  });
+
   it('W9. the date-of-birth box in the chat goes to the API; the chat only hears a fixed sentence', async () => {
     const api = mockApi({
       'GET /me': { body: DEMO },
