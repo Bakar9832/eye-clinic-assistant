@@ -51,7 +51,18 @@ function ClinicSettings() {
   const settings = useQuery({
     queryKey: ['settings'],
     queryFn: () =>
-      api<{ name: string; timezone: string; slotGridMin: number; offerRecheckAfterNewPrescription: boolean; outcomeEditWindowHours: number }>('/staff/settings'),
+      api<{
+        name: string;
+        timezone: string;
+        slotGridMin: number;
+        offerRecheckAfterNewPrescription: boolean;
+        outcomeEditWindowHours: number;
+        maxAppointmentsPerDay: number;
+        bookingActionLimit: number;
+        bookingActionWindowMin: number;
+        dailyChatMessageCap: number;
+        stallMessageThreshold: number;
+      }>('/staff/settings'),
   });
   const [changes, setChanges] = useState<Record<string, unknown>>({});
   const save = useMutation({
@@ -113,6 +124,21 @@ function ClinicSettings() {
             className="ml-2 w-20 rounded border border-slate-300 px-2 py-1"
           />
         </label>
+        <h3 className="mt-2 font-medium">Guardrails</h3>
+        {GUARDRAIL_FIELDS.map(({ key, label, min, max }) => (
+          <label key={key}>
+            {label}
+            <input
+              type="number"
+              aria-label={label}
+              min={min}
+              max={max}
+              value={value(key)}
+              onChange={(e) => set(key, Number(e.target.value))}
+              className="ml-2 w-24 rounded border border-slate-300 px-2 py-1"
+            />
+          </label>
+        ))}
         <button disabled={Object.keys(changes).length === 0 || save.isPending} className="w-fit rounded bg-slate-800 px-3 py-1 text-white disabled:opacity-50">
           Save clinic settings
         </button>
@@ -122,6 +148,15 @@ function ClinicSettings() {
     </section>
   );
 }
+
+/** Limits on patients and the chat (0 turns the per-day limit, the chat cap and stall detection off). */
+const GUARDRAIL_FIELDS = [
+  { key: 'maxAppointmentsPerDay', label: 'Appointments per patient per day (0 = no limit)', min: 0, max: 10 },
+  { key: 'bookingActionLimit', label: 'Booking changes allowed per patient', min: 1, max: 50 },
+  { key: 'bookingActionWindowMin', label: '...within this many minutes', min: 1, max: 1440 },
+  { key: 'dailyChatMessageCap', label: 'Chat messages per day, whole site (0 = no cap)', min: 0, max: 100000 },
+  { key: 'stallMessageThreshold', label: 'Offer a call back after this many messages without progress (0 = off)', min: 0, max: 200 },
+] as const;
 
 function AppointmentTypes() {
   const queryClient = useQueryClient();

@@ -34,6 +34,9 @@ class TurnContext(ApiModel):
     # Urgent eye symptoms were mentioned in this conversation (found by the API in code;
     # staff already alerted). Defaults to False for callers that don't send it.
     urgent_symptoms: bool = False
+    # The chat went on too long without progress (counted by the API): summarise and
+    # offer a call back. The page shows the button; the API adds it.
+    stalled: bool = False
 
 
 class TurnRequest(ApiModel):

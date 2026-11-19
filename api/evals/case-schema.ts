@@ -30,7 +30,7 @@ const TOOLS = [
   'handoff_to_staff',
   'request_callback',
 ] as const;
-const CARD_TYPES = ['doctor_note', 'dob_prompt', 'ticket', 'booking_offer'] as const;
+const CARD_TYPES = ['doctor_note', 'dob_prompt', 'ticket', 'booking_offer', 'callback_offer'] as const;
 
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const TIME = z.string().regex(/^\d{2}:\d{2}$/);

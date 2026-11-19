@@ -124,6 +124,39 @@ describe('the chat', () => {
     expect(within(note).getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login');
   });
 
+  describe('W-CB. a stalled chat offers a call back', () => {
+    const stalled = (loggedIn: boolean) => ({
+      body: { conversationId: 'conv-1', reply: "We've been going round a bit. Would a call from the clinic help?", cards: [{ type: 'callback_offer', loggedIn }] },
+    });
+
+    it('logged in: one click asks for the call back through the API, not the chat', async () => {
+      const api = mockApi({
+        'GET /me': { body: DEMO },
+        'POST /chat': stalled(true),
+        'POST /chat/conv-1/callback': { body: { conversationId: 'conv-1', reply: 'Done. A member of staff will contact you at demo.patient@example.com.', cards: [] } },
+      });
+      renderApp('/');
+
+      await say('I still cannot find a time that works');
+      const card = await screen.findByRole('region', { name: 'Call back offer' });
+      await userEvent.click(within(card).getByRole('button', { name: 'Request a call back' }));
+
+      expect(await screen.findByText(/A member of staff will contact you/)).toBeInTheDocument();
+      expect(api.calls.some((c) => c.method === 'POST' && c.path === '/chat/conv-1/callback')).toBe(true);
+      expect(api.calls.filter((c) => c.path === '/chat')).toHaveLength(1);
+    });
+
+    it('guests are asked to log in instead', async () => {
+      mockApi({ 'POST /chat': stalled(false) });
+      renderApp('/');
+
+      await say('this is going nowhere');
+      const card = await screen.findByRole('region', { name: 'Call back offer' });
+      expect(within(card).queryByRole('button', { name: 'Request a call back' })).not.toBeInTheDocument();
+      expect(within(card).getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login');
+    });
+  });
+
   describe('a booking offer: the patient answers with a button', () => {
     const OFFER = {
       type: 'booking_offer',

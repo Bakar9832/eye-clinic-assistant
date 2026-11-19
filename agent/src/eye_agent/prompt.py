@@ -45,6 +45,13 @@ def build_system_prompt(context: TurnContext) -> str:
         if context.urgent_symptoms
         else ""
     )
+    stalled = (
+        "\nTHIS CHAT HAS GONE ON A WHILE WITHOUT PROGRESS. In this reply, briefly sum up where things stand "
+        "(what they want, what's been tried) and offer a call back from the clinic's staff: the page shows them a "
+        "button for it. Don't repeat questions you've already asked.\n"
+        if context.stalled
+        else ""
+    )
 
     return f"""You are the booking assistant for {context.clinic_name}, an eye clinic. You talk with patients in a web chat.
 
@@ -55,7 +62,7 @@ The visitor's own time zone is {context.viewer_timezone}. Say times in clinic ti
 Write times for the patient exactly as the tools' clinic_time_12h gives them (like 2:30 PM), never in 24-hour form. Tools still take HH:MM.
 
 {login}
-{urgent}
+{urgent}{stalled}
 HOW TO WORK
 - Use the tools for every fact about appointments, times, doctors and results. Never guess or invent a time, a reference or a result.
 BOOKING: first decide which of these the patient's message is.

@@ -29,6 +29,15 @@ def test_urgent_block_only_when_the_api_says_so():
 
 def test_urgent_flag_defaults_to_false_for_older_callers():
     assert context().urgent_symptoms is False
+    assert context().stalled is False
+
+
+def test_stalled_block_only_when_the_api_says_so():
+    assert "WITHOUT PROGRESS" not in build_system_prompt(context())
+    stalled = build_system_prompt(context(stalled=True))
+    assert "WITHOUT PROGRESS" in stalled
+    assert "sum up where things stand" in stalled
+    assert "call back" in stalled
 
 
 def test_guardrail_rules_are_in_the_prompt():

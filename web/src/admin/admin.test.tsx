@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { mockApi, renderApp } from '../test/render';
 import type { GuardrailEvent } from './GuardrailsPage';
@@ -281,7 +281,37 @@ describe('A7. booking with an override', () => {
 });
 
 describe('A8. settings', () => {
-  const settings = { name: 'Demo Eye Clinic', timezone: 'Asia/Karachi', slotGridMin: 15, offerRecheckAfterNewPrescription: false, outcomeEditWindowHours: 72 };
+  const settings = {
+    name: 'Demo Eye Clinic',
+    timezone: 'Asia/Karachi',
+    slotGridMin: 15,
+    offerRecheckAfterNewPrescription: false,
+    outcomeEditWindowHours: 72,
+    maxAppointmentsPerDay: 1,
+    bookingActionLimit: 3,
+    bookingActionWindowMin: 10,
+    dailyChatMessageCap: 150,
+    stallMessageThreshold: 12,
+  };
+
+  it('the guardrail limits can be changed; only the changed one is sent', async () => {
+    const api = staffApi(ADMIN, {
+      'GET /staff/settings': { body: settings },
+      'PATCH /staff/settings': { body: { settings: { ...settings, dailyChatMessageCap: 300 }, bookingsOutsideHours: [] } },
+      'GET /appointment-types': { body: [] },
+      'GET /staff/resources': { body: [] },
+      'GET /staff/users': { body: [] },
+    });
+    renderApp('/admin/settings');
+
+    const cap = await screen.findByLabelText(/Chat messages per day/);
+    expect(cap).toHaveValue(150);
+    fireEvent.change(cap, { target: { value: '300' } });
+    await userEvent.click(screen.getByRole('button', { name: 'Save clinic settings' }));
+
+    await waitFor(() => expect(api.calls.find((c) => c.method === 'PATCH')?.body).toEqual({ dailyChatMessageCap: 300 }));
+    expect(screen.getByLabelText(/Appointments per patient per day/)).toHaveValue(1);
+  });
 
   it("changing the clinic's zone sends only that field and lists the bookings now outside hours", async () => {
     const api = staffApi(ADMIN, {

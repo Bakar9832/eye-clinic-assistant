@@ -1,3 +1,4 @@
+import { requestCallback } from '../guardrails/callbacks.js';
 import { flagIfUrgentConversation } from '../guardrails/urgent.js';
 import { HttpException, Injectable } from '@nestjs/common';
 import { DateTime } from 'luxon';
@@ -21,7 +22,9 @@ export type Card =
   | { type: 'ticket'; reference: string; start: string; doctor: string | null; prepInstructions: string }
   // A free time the patient asked about. Its Confirm button books it from the page, so a
   // question is never turned into a booking by the model.
-  | { type: 'booking_offer'; typeCode: string; typeName: string; start: string; doctorId: string | null; doctor: string | null };
+  | { type: 'booking_offer'; typeCode: string; typeName: string; start: string; doctorId: string | null; doctor: string | null }
+  // Added by the chat (not a tool) when a conversation stalls: a button to ask for a call back.
+  | { type: 'callback_offer'; loggedIn: boolean };
 
 /** What a tool returns: `data` goes to the model, `cards` go to the page. */
 export interface ToolResult {
@@ -386,27 +389,22 @@ export class ClinicToolsService {
 
   // --- Tools that need a logged-in patient ----------------------------------
 
-  /** A call back from staff (Handoffs page, kind CALLBACK). One open request per patient is enough. */
+  /** A call back from staff (Handoffs page, kind CALLBACK). The same rules as the chat's button. */
   private async callback(args: Record<string, string | undefined>, who: AgentIdentity): Promise<ToolResult> {
     const patientId = this.patient(who);
-    const patient = await this.prisma.patient.findUniqueOrThrow({ where: { id: patientId }, select: { email: true } });
-    const open = await this.prisma.handoffRequest.findFirst({ where: { patientId, kind: 'CALLBACK', status: 'OPEN' } });
-    if (open) {
-      return { data: { status: 'ALREADY_REQUESTED', message: `A call back is already on the list; staff will contact ${patient.email}.` } };
-    }
-    const request = await this.prisma.handoffRequest.create({
-      data: {
-        kind: 'CALLBACK',
-        patientId,
-        conversationId: who.conversationId,
-        reason: args.reason!,
-        preferredTime: args.preferred_time,
-        createdAt: this.clock.now(),
-      },
+    const result = await requestCallback(this.prisma, this.audit, {
+      patientId,
+      conversationId: who.conversationId,
+      reason: args.reason!,
+      preferredTime: args.preferred_time,
+      actor: this.actor(who),
+      at: this.clock.now(),
     });
-    // The reason may describe symptoms, so it stays out of the audit log.
-    await this.audit.record({ actor: this.actor(who), action: 'CALLBACK_REQUESTED', entityType: 'HandoffRequest', entityId: request.id });
-    return { data: { status: 'CALLBACK_REQUESTED', message: `Staff will contact ${patient.email}.` } };
+    const message =
+      result.status === 'ALREADY_REQUESTED'
+        ? `A call back is already on the list; staff will contact ${result.contact}.`
+        : `Staff will contact ${result.contact}.`;
+    return { data: { status: result.status, message } };
   }
 
   private async book(args: Record<string, string | undefined>, who: AgentIdentity): Promise<ToolResult> {

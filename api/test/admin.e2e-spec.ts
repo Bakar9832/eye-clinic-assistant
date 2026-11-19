@@ -79,8 +79,24 @@ describe('E1. clinic settings', () => {
       slotGridMin: 15,
       offerRecheckAfterNewPrescription: false,
       outcomeEditWindowHours: 72,
+      maxAppointmentsPerDay: 1,
+      bookingActionLimit: 3,
+      bookingActionWindowMin: 10,
+      dailyChatMessageCap: 150,
+      stallMessageThreshold: 12,
     });
     await (await staffLogin(t, 'reception@clinic.example')).get('/staff/settings').expect(403);
+  });
+
+  it('E1g. the guardrail settings can be changed, within limits', async () => {
+    const res = await (await admin())
+      .patch('/staff/settings')
+      .send({ maxAppointmentsPerDay: 2, bookingActionLimit: 5, bookingActionWindowMin: 30, dailyChatMessageCap: 0, stallMessageThreshold: 20 })
+      .expect(200);
+    expect(res.body.settings).toMatchObject({ maxAppointmentsPerDay: 2, bookingActionLimit: 5, bookingActionWindowMin: 30, dailyChatMessageCap: 0, stallMessageThreshold: 20 });
+
+    await (await admin()).patch('/staff/settings').send({ bookingActionLimit: 0 }).expect(400);
+    await (await admin()).patch('/staff/settings').send({ maxAppointmentsPerDay: -1 }).expect(400);
   });
 
   it('bad values are refused', async () => {

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { DateTime } from 'luxon';
+import { Link } from 'react-router';
 import { api, ApiError, errorText } from '../api/client';
 import type { Card } from '../api/types';
 import { useApp } from '../app-context';
@@ -146,7 +147,38 @@ interface OfferActions {
 }
 
 /** Renders whichever card a tool produced. */
-export function CardView({ card, onDobVerified, offer }: { card: Card; onDobVerified: () => void; offer?: OfferActions }) {
+/** A stalled chat: one click asks the clinic to call back (logged in), or explains how (guest). */
+function CallbackOfferCard({ card, active, onRequest }: { card: Extract<Card, { type: 'callback_offer' }>; active: boolean; onRequest: () => void }) {
+  return (
+    <section aria-label="Call back offer" className="space-y-2 rounded-lg border border-sky-200 bg-sky-50 p-4">
+      <p className="font-medium text-sky-900">Would it be easier to talk to someone?</p>
+      {card.loggedIn ? (
+        <button onClick={onRequest} disabled={!active} className="rounded bg-sky-700 px-4 py-2 text-white disabled:opacity-50">
+          Request a call back
+        </button>
+      ) : (
+        <p className="text-sm text-sky-900">
+          <Link to="/login" className="font-medium underline">
+            Log in
+          </Link>{' '}
+          and the clinic's staff can call you back.
+        </p>
+      )}
+    </section>
+  );
+}
+
+export function CardView({
+  card,
+  onDobVerified,
+  offer,
+  callback,
+}: {
+  card: Card;
+  onDobVerified: () => void;
+  offer?: OfferActions;
+  callback?: { active: boolean; onRequest: () => void };
+}) {
   switch (card.type) {
     case 'doctor_note':
       return <DoctorNoteCard card={card} />;
@@ -156,5 +188,7 @@ export function CardView({ card, onDobVerified, offer }: { card: Card; onDobVeri
       return <DobCard onVerified={onDobVerified} />;
     case 'booking_offer':
       return <BookingOfferCard card={card} actions={offer ?? { active: false, onConfirm: () => {}, onOtherTime: () => {} }} />;
+    case 'callback_offer':
+      return <CallbackOfferCard card={card} active={callback?.active ?? false} onRequest={callback?.onRequest ?? (() => {})} />;
   }
 }

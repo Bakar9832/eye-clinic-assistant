@@ -14,6 +14,10 @@ import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
 import { IsTimezone } from '../http/is-timezone.js';
 import { doctorOf, ticketCard } from '../mcp/clinic-tools.service.js';
+import { AuditService } from '../audit/audit.service.js';
+import { requestCallback } from '../guardrails/callbacks.js';
+import { recordGuardrail } from '../guardrails/guardrails.js';
+import { checkStalled } from '../guardrails/stalling.js';
 import { flagIfUrgentConversation, screenMessage } from '../guardrails/urgent.js';
 import { AgentClient } from './agent-client.js';
 import { redactDateOfBirth } from './redact.js';
@@ -27,6 +31,8 @@ const ANON_COOKIE = 'chat_anon';
 const CONVERSATION_ID = /^[0-9a-f-]{36}$/i;
 /** What the conversation records for a click on Confirm. */
 const CONFIRM_MESSAGE = 'Yes, please book it.';
+/** What the "Request a call back" button says for the patient. */
+const CALLBACK_MESSAGE = 'Please ask the clinic to call me back.';
 
 class ChatDto {
   @IsString()
@@ -61,6 +67,7 @@ export class ChatController {
     private readonly agent: AgentClient,
     private readonly booking: BookingService,
     private readonly clock: Clock,
+    private readonly audit: AuditService,
   ) {}
 
   @Post()
@@ -81,6 +88,7 @@ export class ChatController {
     if (recent >= CHAT_LIMIT.messages) {
       throw httpError(HttpStatus.TOO_MANY_REQUESTS, 'RATE_LIMITED', 'Too many messages. Please wait a few minutes.');
     }
+    await this.refuseOverDailyCap(owner.patientId, now);
 
     const conversation = body.conversationId
       ? await this.prisma.conversation.findFirst({ where: { id: body.conversationId, ...owner.where } })
@@ -103,6 +111,13 @@ export class ChatController {
     const { urgent } = await screenMessage(this.prisma, { message: body.message, patientId: owner.patientId, conversationId: conversation.id, at: now });
 
     const settings = await clinicSettings(this.prisma);
+    const stalled = await checkStalled(this.prisma, {
+      conversationId: conversation.id,
+      conversationStartedAt: conversation.createdAt,
+      patientId: owner.patientId,
+      threshold: settings.stallMessageThreshold,
+      at: now,
+    });
     const patient = owner.patientId ? await this.prisma.patient.findUnique({ where: { id: owner.patientId } }) : null;
     const viewerTimezone = body.viewerTimezone ?? patient?.timezone ?? settings.timezone;
     const today = DateTime.fromJSDate(now, { zone: settings.timezone });
@@ -125,6 +140,7 @@ export class ChatController {
           viewerTimezone,
           loggedIn: owner.patientId !== null,
           urgentSymptoms: urgent,
+          stalled,
         },
       });
     } catch (error) {
@@ -133,6 +149,8 @@ export class ChatController {
     }
 
     const reply = redactDateOfBirth(turn.reply.trim(), patient?.dateOfBirth) || 'Sorry, I could not answer that. Could you rephrase?';
+    // A stalled chat always gets the call-back button, added here so it never depends on the model.
+    if (stalled) turn.cards = [...turn.cards, { type: 'callback_offer', loggedIn: owner.patientId !== null }];
     const answeredAt = this.clock.now();
     await this.prisma.$transaction([
       this.prisma.chatMessage.create({
@@ -185,6 +203,67 @@ export class ChatController {
       this.prisma.conversation.update({ where: { id }, data: { lastMessageAt: at } }),
     ]);
     return { conversationId: id, reply, cards };
+  }
+
+  /**
+   * The "Request a call back" button. Like Confirm, the click is the request: no model in
+   * between. Both sides go into the conversation so the agent knows on its next turn.
+   */
+  @Post(':id/callback')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(SessionGuard)
+  async callback(@Param('id') id: string, @CurrentPatient() me: PatientActor) {
+    const conversation = CONVERSATION_ID.test(id) ? await this.prisma.conversation.findFirst({ where: { id, patientId: me.id } }) : null;
+    if (!conversation) throw httpError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Conversation not found.');
+
+    const at = this.clock.now();
+    const result = await requestCallback(this.prisma, this.audit, {
+      patientId: me.id,
+      conversationId: id,
+      reason: 'Asked for a call back with the button in the chat.',
+      actor: me,
+      at,
+    });
+    const reply =
+      result.status === 'ALREADY_REQUESTED'
+        ? `You're already on the list: a member of staff will contact you at ${result.contact}.`
+        : `Done. A member of staff will contact you at ${result.contact}.`;
+    await this.prisma.$transaction([
+      this.prisma.chatMessage.create({ data: { conversationId: id, role: 'USER', text: CALLBACK_MESSAGE, createdAt: at } }),
+      this.prisma.chatMessage.create({ data: { conversationId: id, role: 'ASSISTANT', text: reply, createdAt: at } }),
+      this.prisma.conversation.update({ where: { id }, data: { lastMessageAt: at } }),
+    ]);
+    return { conversationId: id, reply, cards: [] };
+  }
+
+  /**
+   * The site-wide daily cap (ClinicSetting.dailyChatMessageCap, 0 = off): patient messages
+   * since clinic midnight, across everyone, so a free LLM quota lasts the day. Checked
+   * before anything is saved or the agent is called. Logged once a day for staff.
+   */
+  private async refuseOverDailyCap(patientId: string | null, now: Date) {
+    const { dailyChatMessageCap, timezone } = await clinicSettings(this.prisma);
+    if (dailyChatMessageCap <= 0) return;
+    const midnight = DateTime.fromJSDate(now, { zone: timezone }).startOf('day').toJSDate();
+    const today = await this.prisma.chatMessage.count({ where: { role: 'USER', createdAt: { gte: midnight } } });
+    if (today < dailyChatMessageCap) return;
+
+    const logged = await this.prisma.guardrailEvent.findFirst({ where: { kind: 'CHAT_CAP', createdAt: { gte: midnight } } });
+    if (!logged) {
+      await recordGuardrail(this.prisma, {
+        kind: 'CHAT_CAP',
+        patientId,
+        action: 'CHAT',
+        reasonCode: 'DAILY_CAP',
+        message: `The daily cap of ${dailyChatMessageCap} chat messages was reached; the assistant said it was busy until tomorrow.`,
+        at: now,
+      });
+    }
+    throw httpError(
+      HttpStatus.SERVICE_UNAVAILABLE,
+      'CHAT_BUSY',
+      'The assistant is busy today. You can still book on the Book page, or try the chat again tomorrow.',
+    );
   }
 
   @Get(':id')

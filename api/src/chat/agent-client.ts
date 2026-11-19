@@ -18,6 +18,8 @@ export interface AgentTurnRequest {
     loggedIn: boolean;
     /** Urgent eye symptoms were mentioned in this conversation (found in code; staff already alerted). */
     urgentSymptoms: boolean;
+    /** The chat just went on too long without progress (counted in code): summarise and offer a call back. */
+    stalled: boolean;
   };
 }
 

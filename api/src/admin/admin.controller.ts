@@ -31,6 +31,12 @@ class SettingsDto {
   @IsOptional() @IsIn([5, 10, 15, 20, 30, 60], { message: 'slotGridMin must be 5, 10, 15, 20, 30 or 60' }) slotGridMin?: number;
   @IsOptional() @IsBoolean() offerRecheckAfterNewPrescription?: boolean;
   @IsOptional() @IsInt() @Min(1) @Max(720) outcomeEditWindowHours?: number;
+  // Guardrails. 0 = off for the per-day limit, the chat cap and the stall threshold.
+  @IsOptional() @IsInt() @Min(0) @Max(10) maxAppointmentsPerDay?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(50) bookingActionLimit?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(1440) bookingActionWindowMin?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(100000) dailyChatMessageCap?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(200) stallMessageThreshold?: number;
 }
 
 class StepDurationDto {
@@ -117,6 +123,11 @@ export class AdminController {
       slotGridMin: s.slotGridMin,
       offerRecheckAfterNewPrescription: s.offerRecheckAfterNewPrescription,
       outcomeEditWindowHours: s.outcomeEditWindowHours,
+      maxAppointmentsPerDay: s.maxAppointmentsPerDay,
+      bookingActionLimit: s.bookingActionLimit,
+      bookingActionWindowMin: s.bookingActionWindowMin,
+      dailyChatMessageCap: s.dailyChatMessageCap,
+      stallMessageThreshold: s.stallMessageThreshold,
     };
   }
 

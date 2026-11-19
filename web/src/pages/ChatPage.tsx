@@ -96,6 +96,14 @@ export function ChatPage() {
     );
   }
 
+  /** "Request a call back" on a stalled chat: the click is the request, like Confirm. */
+  async function requestCallback() {
+    if (busy || !conversationId) return;
+    await exchange('Please ask the clinic to call me back.', () =>
+      api<ChatReply>(`/chat/${conversationId}/callback`, { method: 'POST' }),
+    );
+  }
+
   function submit(e: FormEvent) {
     e.preventDefault();
     const text = input;
@@ -144,6 +152,7 @@ export function ChatPage() {
                       onConfirm: (offer) => void confirmBooking(offer),
                       onOtherTime: () => void send(OTHER_TIME_MESSAGE),
                     }}
+                    callback={{ active: i === bubbles.length - 1 && !busy, onRequest: () => void requestCallback() }}
                   />
                 </div>
               ))}

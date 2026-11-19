@@ -12,6 +12,11 @@ export interface SettingsChange {
   slotGridMin?: number;
   offerRecheckAfterNewPrescription?: boolean;
   outcomeEditWindowHours?: number;
+  maxAppointmentsPerDay?: number;
+  bookingActionLimit?: number;
+  bookingActionWindowMin?: number;
+  dailyChatMessageCap?: number;
+  stallMessageThreshold?: number;
 }
 
 export interface TypeChange {
