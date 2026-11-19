@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { api, errorText } from '../api/client';
 import { useApp } from '../app-context';
@@ -23,7 +23,9 @@ export function LoginPage() {
   const [params] = useSearchParams();
   const next = params.get('next')?.startsWith('/') ? params.get('next')! : '/';
 
-  const [mode, setMode] = useState<Mode>('login');
+  // "Sign up" in the header opens this page in its create-account mode.
+  const wanted: Mode = params.get('mode') === 'signup' ? 'signup' : 'login';
+  const [mode, setMode] = useState<Mode>(wanted);
   const [codeSent, setCodeSent] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -40,6 +42,11 @@ export function LoginPage() {
     setCode('');
     setError(null);
   }
+  useEffect(() => {
+    switchTo(wanted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the link changes the mode
+  }, [wanted]);
+
 
   async function run(action: () => Promise<void>) {
     setBusy(true);

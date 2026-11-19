@@ -70,15 +70,21 @@ export function Layout() {
                 </button>
               </span>
             ) : (
-              me === null && (
+              // Shown at once, also while it isn't known yet who is logged in: the header never
+              // waits for the login check (a sleeping server can take a minute to answer).
+              <span className="flex items-center gap-3">
                 <Link to="/login" className="rounded bg-brand-600 px-4 py-1.5 text-white">
                   Log in
                 </Link>
-              )
+                <Link to="/login?mode=signup" className="text-brand-700 hover:underline">
+                  Sign up
+                </Link>
+              </span>
             )}
           </div>
         </div>
       </header>
+      <ConnectionNotice />
       <ProfileBanner />
       <div className="mx-auto flex min-h-0 w-full max-w-[112rem] flex-1 gap-6 px-4 py-4 lg:px-6">
         <aside className="hidden w-64 shrink-0 overflow-y-auto lg:block">
@@ -133,6 +139,31 @@ function ClinicCard() {
         </div>
       )}
       <p className="text-xs text-slate-500">Sudden vision loss, severe pain or an eye injury? Go to emergency care now.</p>
+    </div>
+  );
+}
+
+/**
+ * Says what's happening while the clinic API is slow to answer (a free-tier server waking
+ * up) and offers Retry when it can't be reached. It keeps trying in the background either way.
+ */
+function ConnectionNotice() {
+  const { connection, retryConnection } = useApp();
+  if (connection === 'ok') return null;
+  return (
+    <div role="status" className="shrink-0 border-b border-slate-200 bg-slate-50">
+      <div className="mx-auto flex max-w-[112rem] flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-slate-700">
+        {connection === 'waking' ? (
+          <span>Waking up the assistant, this can take up to a minute.</span>
+        ) : (
+          <>
+            <span>Can't reach the clinic right now. We'll keep trying.</span>
+            <button onClick={retryConnection} className="rounded border border-slate-300 bg-white px-3 py-1 hover:border-slate-500">
+              Retry
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }

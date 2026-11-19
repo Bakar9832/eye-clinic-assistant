@@ -24,9 +24,22 @@ const FRIENDLY: Record<string, string> = {
   UNAUTHENTICATED: 'Please log in first.',
   INVALID_CODE: 'That code is wrong or has expired. Check the email or ask for a new code.',
   NETWORK: "Can't reach the clinic. Check your connection and try again.",
+  TIMEOUT: 'The clinic took too long to answer. Please try again.',
 };
 
-export async function api<T>(path: string, options: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: unknown } = {}): Promise<T> {
+/**
+ * A problem with reaching the clinic, not an answer from it: no connection, a time-out,
+ * or a 5xx (Vercel answers 502 while the free-tier server is still waking up). Worth
+ * retrying; a 4xx is a real answer and isn't.
+ */
+export function isConnectionProblem(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 0 || error.status >= 500);
+}
+
+export async function api<T>(
+  path: string,
+  options: { method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'; body?: unknown; timeoutMs?: number } = {},
+): Promise<T> {
   const method = options.method ?? 'GET';
   const changes = method !== 'GET';
 
@@ -38,8 +51,11 @@ export async function api<T>(path: string, options: { method?: 'GET' | 'POST' | 
       // Every request that changes something is JSON: the API's CSRF rule requires it.
       headers: changes ? { 'Content-Type': 'application/json' } : undefined,
       body: changes ? JSON.stringify(options.body ?? {}) : undefined,
+      // A request to a sleeping server can hang; with a limit it ends and can be retried.
+      signal: options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'TimeoutError') throw new ApiError(0, 'TIMEOUT', FRIENDLY.TIMEOUT);
     throw new ApiError(0, 'NETWORK', FRIENDLY.NETWORK);
   }
 
