@@ -192,7 +192,7 @@ export function ChatPage() {
           <div ref={end} />
         </div>
 
-        <form onSubmit={submit} className="flex shrink-0 items-center gap-2 rounded-xl border border-line bg-white p-1.5 pl-4 focus-within:border-slate-400">
+        <form onSubmit={submit} className="flex shrink-0 items-center gap-2 rounded-xl border border-line bg-white p-1.5 pl-4 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/20">
           <input
             aria-label="Message"
             value={input}
@@ -200,7 +200,7 @@ export function ChatPage() {
             onChange={(e) => setInput(e.target.value)}
             disabled={connecting}
             placeholder={connecting ? 'Connecting…' : 'e.g. Book an eye test with Dr Ayesha next Tuesday morning'}
-            className="min-w-0 flex-1 bg-transparent py-2 placeholder:text-slate-400 focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed"
+            className="min-w-0 flex-1 bg-transparent py-2 focus:outline-none focus-visible:outline-none disabled:cursor-not-allowed"
           />
           <button
             aria-label="Send"

@@ -88,6 +88,12 @@ body {
     border-color: var(--color-line);
   }
 
+  /* Placeholders at 4.7:1 (Tailwind's default grey is lighter). */
+  ::placeholder {
+    color: var(--color-slate-500);
+    opacity: 1;
+  }
+
   h1,
   h2,
   h3 {
