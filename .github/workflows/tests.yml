@@ -123,9 +123,11 @@ jobs:
         working-directory: web
       - run: npm ci
         working-directory: e2e
+      # The runner image already has the system libraries Chromium needs (it ships Chrome);
+      # --with-deps would apt-get them from Ubuntu's mirrors, which failed twice in a row.
       - name: Install Chromium
         working-directory: e2e
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Browser tests (migrate, seed, start API + web + scripted agent, run)
         working-directory: e2e
         run: npx playwright test
