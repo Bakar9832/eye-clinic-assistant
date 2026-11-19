@@ -189,7 +189,7 @@ describe('Book page states and keyboard (55+ redesign, phase 2)', () => {
     await pickFirstSlot();
     expect(screen.getByRole('link', { name: 'Log in to confirm' })).not.toHaveAttribute('aria-disabled', 'true');
     await userEvent.click(screen.getByRole('button', { name: /Later/ }));
-    expect(await screen.findByText('Choose a time to continue.')).toBeInTheDocument();
+    expect(await screen.findByText(/Choose a time to continue/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Earlier/ })).toBeEnabled();
   });
 });

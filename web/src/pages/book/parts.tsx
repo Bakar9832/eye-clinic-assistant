@@ -28,7 +28,7 @@ export function Step({ id, number, title, children }: { id: string; number: numb
   return (
     <section aria-labelledby={id} className="space-y-4">
       <h2 id={id} className="flex items-center gap-3 text-xl">
-        <span aria-hidden className="grid size-8 place-items-center rounded-full bg-ink text-base font-semibold text-white">
+        <span aria-hidden className="grid size-9 place-items-center rounded-full bg-ink font-semibold text-white">
           {number}
         </span>
         {title}
@@ -177,17 +177,19 @@ export function WeekStrip({
   canGoEarlier: boolean;
 }) {
   return (
-    <div className="flex items-stretch gap-2">
+    // Code order = visual order (Earlier, days, Later), so Tab follows what you see: at the
+    // sides on wider screens, above and below the days (full width) on phones.
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
       <button
         type="button"
         onClick={onEarlier}
         disabled={!canGoEarlier}
-        className="flex min-h-12 shrink-0 flex-col items-center justify-center rounded-lg border-2 border-line px-2 text-ink disabled:cursor-not-allowed disabled:text-slate-400"
+        className="flex min-h-12 shrink-0 items-center justify-center gap-1 rounded-lg border-2 border-line px-3 text-ink sm:flex-col disabled:cursor-not-allowed disabled:bg-surface disabled:text-ink-muted"
       >
-        <ChevronLeft aria-hidden className="size-5" />
-        <span className="text-base">Earlier</span>
+        <ChevronLeft aria-hidden className="size-5 max-sm:rotate-90" />
+        <span>Earlier</span>
       </button>
-      <div role="group" aria-label="Pick a day" onKeyDown={arrowKeys} className="grid min-w-0 flex-1 grid-cols-7 gap-2">
+      <div role="group" aria-label="Pick a day" onKeyDown={arrowKeys} className="grid min-w-0 flex-1 grid-cols-4 gap-2 sm:grid-cols-7">
         {days.map((d) => {
           const enabled = (x: DayInfo) => x.status === 'ready' && x.slots.length > 0;
           const stop = tabStop(days, (x) => x.day === selected, enabled);
@@ -206,12 +208,12 @@ export function WeekStrip({
               onSelect={() => onSelect(d.day)}
               className="flex flex-col items-center justify-center gap-0.5 px-1 py-2 text-center"
             >
-              <span className="text-base">{d.relative ?? d.weekday}</span>
+              <span>{d.relative ?? d.weekday}</span>
               <span className="text-2xl leading-none font-semibold tabular-nums">{d.date}</span>
-              <span className="text-base">{d.month}</span>
-              {empty && <span className="text-sm">No times</span>}
+              <span>{d.month}</span>
+              {empty && <span>No times</span>}
               {d.status === 'loading' && <span aria-hidden className="mt-1 h-3 w-10 animate-pulse rounded bg-slate-200" />}
-              {d.status === 'error' && <span className="text-sm">Not loaded</span>}
+              {d.status === 'error' && <span>Not loaded</span>}
             </Choice>
           );
         })}
@@ -219,10 +221,10 @@ export function WeekStrip({
       <button
         type="button"
         onClick={onLater}
-        className="flex min-h-12 shrink-0 flex-col items-center justify-center rounded-lg border-2 border-line px-2 text-ink"
+        className="flex min-h-12 shrink-0 items-center justify-center gap-1 rounded-lg border-2 border-line px-3 text-ink sm:flex-col"
       >
-        <ChevronRight aria-hidden className="size-5" />
-        <span className="text-base">Later</span>
+        <span className="sm:order-last">Later</span>
+        <ChevronRight aria-hidden className="size-5 max-sm:rotate-90" />
       </button>
     </div>
   );
@@ -254,8 +256,8 @@ export function TimeGrid({
               tabIndex={slot === stop ? 0 : -1}
               className="pr-10 text-lg"
             >
-              <TimeText iso={slot.start} compact />
-              {slot.doctor && <span className={`block text-base ${isSelected(slot) ? 'text-slate-200' : 'text-ink-muted'}`}>{slot.doctor.displayName}</span>}
+              <TimeText iso={slot.start} compact large />
+              {slot.doctor && <span className={`block ${isSelected(slot) ? 'text-slate-200' : 'text-ink-muted'}`}>{slot.doctor.displayName}</span>}
             </Choice>
           ))}
         </div>

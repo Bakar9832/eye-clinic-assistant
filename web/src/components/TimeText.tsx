@@ -2,7 +2,7 @@ import { useApp } from '../app-context';
 import { formatTime, zoneLabel } from '../time/zones';
 
 /** A moment in clinic time, plus the viewer's time when their zone differs. Tabular digits, so times line up. */
-export function TimeText({ iso, compact = false }: { iso: string; compact?: boolean }) {
+export function TimeText({ iso, compact = false, large = false }: { iso: string; compact?: boolean; large?: boolean }) {
   const { clinic, viewerZone } = useApp();
   if (!clinic) return null;
   const t = formatTime(iso, clinic.timezone, viewerZone);
@@ -12,7 +12,7 @@ export function TimeText({ iso, compact = false }: { iso: string; compact?: bool
     return (
       <span className="flex flex-col leading-tight tabular-nums">
         <span>{t.clinicTime}</span>
-        {t.viewer && <span className="text-xs text-slate-500">{t.viewer} yours</span>}
+        {t.viewer && <span className={large ? 'text-[1.125rem] opacity-85' : 'text-xs text-slate-500'}>{t.viewer} yours</span>}
       </span>
     );
   }

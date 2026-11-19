@@ -12,7 +12,8 @@ import { daysFrom, todayIn } from '../time/zones';
 import { DoctorPicker, PrepNote, Step, TimeGrid, TimeGridSkeleton, VisitTypePicker, WeekStrip, type DayInfo, type Slot } from './book/parts';
 
 const DEFAULT_TYPE = 'ROUTINE_EYE_TEST';
-const primary = 'min-h-12 rounded-lg bg-ink px-6 font-semibold text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-500';
+// Disabled: dark grey on light grey (7.2:1), readable for this audience, not just faded.
+const primary = 'min-h-12 rounded-lg bg-ink px-6 font-semibold text-white hover:bg-slate-800 disabled:bg-slate-100 disabled:text-ink-muted';
 
 /**
  * Book: one decision at a time (visit, doctor, day, time), then Confirm. The choice lives
@@ -211,17 +212,17 @@ export function CalendarPage() {
               {chosen.doctor && `, with ${chosen.doctor.displayName}`}
             </>
           ) : (
-            <span className="text-ink-muted">Choose a time to continue.</span>
+            <span className="text-ink-muted">Choose a time to continue. The button below works once you have.</span>
           )}
         </p>
         {me === null ? (
-          <Link to={loginTo} aria-disabled={!chosen} className={`${primary} inline-flex items-center ${chosen ? '' : 'pointer-events-none bg-slate-200 text-slate-500'}`}>
+          <Link to={loginTo} aria-disabled={!chosen} className={`${primary} inline-flex w-full items-center justify-center sm:w-auto ${chosen ? '' : 'pointer-events-none bg-slate-100 text-ink-muted'}`}>
             Log in to confirm
           </Link>
         ) : needsDetails ? (
           <span className="text-ink-muted">Add your details above to confirm.</span>
         ) : (
-          <button type="button" onClick={() => chosen && book.mutate(chosen)} disabled={!chosen || book.isPending || me === undefined} className={primary}>
+          <button type="button" onClick={() => chosen && book.mutate(chosen)} disabled={!chosen || book.isPending || me === undefined} className={`${primary} w-full sm:w-auto`}>
             Confirm booking
           </button>
         )}
