@@ -23,11 +23,26 @@ async function staffLogIn(page: Page, email: string) {
   await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible();
 }
 
-/** The first day on the Book page that has a free time, and its first free time. */
+const TIME = /\d:\d\d (AM|PM)/;
+
+/**
+ * A day on the Book page after today with at least two free times, pinned by its name.
+ * Not today: its last times run out while the test runs, and a locator that is looked up
+ * again would then quietly move to another day.
+ */
 async function firstFreeSlot(page: Page) {
-  const day = page.locator('section[aria-label]').filter({ has: page.getByRole('button', { name: /\d:\d\d (AM|PM)/ }) }).first();
-  await expect(day).toBeVisible();
-  return { day, slot: day.getByRole('button', { name: /\d:\d\d (AM|PM)/ }).first() };
+  const days = page.locator('section[aria-label]');
+  await expect(days.first()).toBeVisible();
+  await expect(days.getByRole('button', { name: TIME }).first()).toBeVisible();
+  const count = await days.count();
+  for (let i = 1; i < count; i++) {
+    if ((await days.nth(i).getByRole('button', { name: TIME }).count()) >= 2) {
+      const name = (await days.nth(i).getAttribute('aria-label'))!;
+      const day = page.getByRole('region', { name, exact: true });
+      return { day, slot: day.getByRole('button', { name: TIME }).first() };
+    }
+  }
+  throw new Error('No day after today with two free times on the Book page');
 }
 
 type Appointment = { reference: string; status: string; start: string };

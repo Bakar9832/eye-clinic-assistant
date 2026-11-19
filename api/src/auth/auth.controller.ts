@@ -30,13 +30,6 @@ export class AuthController {
     return { loggedIn: true };
   }
 
-  @Post('demo')
-  @HttpCode(HttpStatus.OK)
-  async demo(@Ip() ip: string, @Res({ passthrough: true }) res: Response) {
-    setSessionCookie(res, await this.auth.demoLogin(ip));
-    return { loggedIn: true };
-  }
-
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(@Req() req: Request, @Ip() ip: string, @Res({ passthrough: true }) res: Response) {

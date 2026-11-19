@@ -22,7 +22,7 @@ export const CATEGORIES = [
   'plain_language',
 ] as const;
 
-export const PATIENTS = ['demo', 'two', 'three'] as const;
+const PATIENTS = ['demo', 'two', 'three'] as const;
 const TOOLS = [
   'list_appointment_types',
   'check_availability',

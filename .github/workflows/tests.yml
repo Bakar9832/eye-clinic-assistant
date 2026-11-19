@@ -29,7 +29,6 @@ jobs:
       AGENT_TOKEN_SECRET: ci-only-agent-token-secret
       AGENT_URL: http://localhost:8001
       AGENT_SERVICE_KEY: ci-only-agent-service-key
-      DEMO_MODE: 'true'
     defaults:
       run:
         working-directory: api

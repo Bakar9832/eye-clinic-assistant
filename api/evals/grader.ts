@@ -64,7 +64,7 @@ export function createGrader(options: { baseUrl: string; apiKey: string; models:
 }
 
 /** Models sometimes wrap JSON in ```json fences or add a sentence; take the first {...}. */
-export function parseVerdicts(text: string): { n: number; pass: boolean; reason?: string }[] {
+function parseVerdicts(text: string): { n: number; pass: boolean; reason?: string }[] {
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) return [];
   try {

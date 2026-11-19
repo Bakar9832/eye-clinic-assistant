@@ -208,13 +208,6 @@ model Patient {
   @@map("patients")
 }
 
-/// Which door a login code opens. Kept apart so a patient code never logs anyone into staff.
-enum LoginPurpose {
-  PATIENT
-  STAFF
-}
-
-/// A one-time login code. Only a keyed hash is stored; rows are kept for rate limiting.
 /// One row per wrong password (or unknown email), for the login rate limits.
 /// Not the audit log: it holds the email typed, and is deleted after a day.
 model LoginFailure {
@@ -229,9 +222,10 @@ model LoginFailure {
   @@map("login_failures")
 }
 
+/// A one-time code for sign-up or a password reset. Only a keyed hash is stored; rows are
+/// kept a day for the rate limits.
 model LoginCode {
   id         String       @id @default(uuid()) @db.Uuid
-  purpose    LoginPurpose @default(PATIENT)
   email      String
   /// HMAC-SHA256(AUTH_SECRET, email:code). Useless without the secret.
   codeHash   String    @map("code_hash")
@@ -241,7 +235,7 @@ model LoginCode {
   expiresAt  DateTime  @map("expires_at") @db.Timestamptz(3)
   consumedAt DateTime? @map("consumed_at") @db.Timestamptz(3)
 
-  @@index([email, purpose, createdAt])
+  @@index([email, createdAt])
   @@index([requestIp, createdAt])
   @@map("login_codes")
 }

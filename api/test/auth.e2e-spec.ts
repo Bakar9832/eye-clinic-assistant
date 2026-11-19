@@ -292,21 +292,6 @@ describe('sessions', () => {
     expect(sessions.map((s) => s.tokenHash)).toContain(createHash('sha256').update(token).digest('hex'));
   });
 
-  it('A15. the demo login works only when DEMO_MODE=true', async () => {
-    const original = process.env.DEMO_MODE;
-    try {
-      process.env.DEMO_MODE = 'true';
-      const browser = t.browser();
-      await browser.post('/auth/demo').set('Content-Type', 'application/json').expect(200);
-      expect((await browser.get('/me').expect(200)).body.email).toBe(DEMO);
-
-      process.env.DEMO_MODE = 'false';
-      await t.http().post('/auth/demo').set('Content-Type', 'application/json').expect(404);
-    } finally {
-      process.env.DEMO_MODE = original;
-    }
-  });
-
   it('B5. /me without a session cookie is 401', async () => {
     await t.http().get('/me').expect(401);
     await t.http().patch('/me').send({ fullName: 'X' }).expect(401);

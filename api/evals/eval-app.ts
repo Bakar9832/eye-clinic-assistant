@@ -40,7 +40,7 @@ export interface Usage {
 
 /** The real tools, with every call written down. */
 @Injectable()
-export class RecordingTools extends ClinicToolsService {
+class RecordingTools extends ClinicToolsService {
   override async call(name: ToolName, rawArgs: unknown, who: AgentIdentity): Promise<ToolResult> {
     const result = await super.call(name, rawArgs, who);
     toolLog.push({ name, args: rawArgs, isError: result.isError ?? false });

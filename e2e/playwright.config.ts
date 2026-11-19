@@ -26,14 +26,13 @@ const apiEnv = {
   AGENT_TOKEN_SECRET: 'e2e-only-agent-token-secret',
   AGENT_SERVICE_KEY,
   AGENT_URL: `http://127.0.0.1:${PORTS.agent}`,
-  DEMO_MODE: 'false',
   SMTP_HOST: '',
   NOTIFICATIONS_EVERY_SECONDS: '0',
   RETENTION_EVERY_HOURS: '0',
   TRUST_PROXY_HOPS: '0',
 } as Record<string, string>;
 
-export const BASE_URL = `http://127.0.0.1:${PORTS.web}`;
+const BASE_URL = `http://127.0.0.1:${PORTS.web}`;
 
 export default defineConfig({
   testDir: './tests',

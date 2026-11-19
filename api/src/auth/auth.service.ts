@@ -210,14 +210,6 @@ export class AuthService {
       : this.startSession({ patientId: account.id }, 'LOGIN_SUCCEEDED', ip, minutes(SESSION_DAYS * 24 * 60));
   }
 
-  /** "Try as demo patient". Only when DEMO_MODE=true; read on every call so it can be switched off. */
-  async demoLogin(ip: string | undefined): Promise<NewSession> {
-    const demo =
-      process.env.DEMO_MODE === 'true' ? await this.prisma.patient.findFirst({ where: { isDemo: true } }) : null;
-    if (!demo) throw httpError(HttpStatus.NOT_FOUND, 'NOT_FOUND', 'Not found.');
-    return this.startSession({ patientId: demo.id }, 'DEMO_LOGIN', ip, minutes(SESSION_DAYS * 24 * 60));
-  }
-
   /** The session behind a cookie, or null if it's missing, revoked or expired. */
   async findSession(token: string | undefined) {
     if (!token) return null;

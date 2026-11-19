@@ -38,8 +38,6 @@ services:
       # The agent's Render URL, e.g. https://eye-clinic-agent.onrender.com
       - key: AGENT_URL
         sync: false
-      - key: DEMO_MODE
-        value: "false"
       # Email for sign-up and reset codes (Brevo; see docs/deployment.md). Set in the
       # dashboard, so a Blueprint sync never overwrites them. SMTP_HOST empty = the log.
       - key: SMTP_HOST
