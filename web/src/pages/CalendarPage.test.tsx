@@ -52,27 +52,38 @@ function calendarApi(me: object | null) {
   });
 }
 
+/** The first free time on the first day with times (chosen by default). */
 async function pickFirstSlot() {
-  const firstDay = (await screen.findAllByRole('region'))[0];
-  await userEvent.click(await within(firstDay).findByRole('button', { name: /10:00/ }));
+  const times = await screen.findByRole('region', { name: 'Pick a time' });
+  await userEvent.click(await within(times).findByRole('button', { name: /10:00 AM/ }));
 }
 
 describe('the booking calendar', () => {
-  it('W11. shows a week of free times; booking first asks a logged-out visitor to log in', async () => {
+  // Changed with the 55+ redesign (approved): day cards became day buttons, "Book this"
+  // became "Confirm booking", the dropdowns became cards and buttons. Same checks.
+  it('W11. shows a week of days; a logged-out visitor confirms by logging in, keeping the choice', async () => {
     calendarApi(null);
     renderApp('/calendar');
 
-    expect(await screen.findAllByRole('region')).toHaveLength(7);
+    const week = await screen.findByRole('group', { name: 'Pick a day' });
+    expect(await within(week).findAllByRole('button')).toHaveLength(7);
     await pickFirstSlot();
-    expect(screen.getByText('Please log in to book.')).toBeInTheDocument();
+    const login = screen.getByRole('link', { name: 'Log in to confirm' });
+    const next = decodeURIComponent(login.getAttribute('href')!.split('next=')[1]);
+    expect(next).toMatch(/^\/calendar\?/);
+    expect(next).toContain('start=');
+    expect(next).toContain('slotDoctor=doc-ayesha');
   });
 
   it('W11b. logged in: books the chosen time with that doctor and shows the ticket', async () => {
     const api = calendarApi(DEMO);
     renderApp('/calendar');
 
+    const confirm = await screen.findByRole('button', { name: 'Confirm booking' });
+    expect(confirm).toBeDisabled(); // nothing chosen yet
     await pickFirstSlot();
-    await userEvent.click(screen.getByRole('button', { name: 'Book this' }));
+    expect(screen.getByRole('button', { name: /10:00 AM/, pressed: true })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm booking' }));
 
     expect(await screen.findByText('EC-ABC234')).toBeInTheDocument();
     const booking = api.calls.find((c) => c.method === 'POST' && c.path === '/me/appointments');
@@ -85,16 +96,19 @@ describe('the booking calendar', () => {
 
     await pickFirstSlot();
     expect(screen.getByRole('form', { name: 'Your details' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Book this' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Confirm booking' })).toBeNull();
   });
 
   it("only offers doctors who do that kind of visit: a child's exam is Dr Ayesha only", async () => {
     calendarApi(null);
     renderApp('/calendar');
 
-    await screen.findByRole('option', { name: /Child's eye exam/ }); // types have loaded
-    await userEvent.selectOptions(screen.getByLabelText('Appointment type'), 'CHILD_EYE_EXAM');
-    const doctors = within(screen.getByLabelText('Doctor')).getAllByRole('option').map((o) => o.textContent);
-    expect(doctors).toEqual(['Any doctor', 'Dr Ayesha']);
+    const visits = await screen.findByRole('group', { name: 'Type of visit' });
+    await userEvent.click(await within(visits).findByRole('button', { name: /Child's eye exam/ }));
+    expect(within(visits).getByRole('button', { name: /Child's eye exam/ })).toHaveAttribute('aria-pressed', 'true');
+    const doctors = within(screen.getByRole('group', { name: 'Doctor' }))
+      .getAllByRole('button')
+      .map((b) => b.textContent);
+    expect(doctors).toEqual(['Any doctor (soonest)', 'Dr Ayesha']);
   });
 });

@@ -26,19 +26,21 @@ async function staffLogIn(page: Page, email: string) {
 const TIME = /\d:\d\d (AM|PM)/;
 
 /**
- * A day on the Book page after today with at least two free times, pinned by its name.
- * Not today: its last times run out while the test runs, and a locator that is looked up
- * again would then quietly move to another day.
+ * Picks a day after today with at least two free times in the week strip (not today: its
+ * last times run out while the test runs) and returns that day's time buttons.
+ * Changed with the 55+ Book page redesign: days are buttons, times are one step below.
  */
 async function firstFreeSlot(page: Page) {
-  const days = page.locator('section[aria-label]');
-  await expect(days.first()).toBeVisible();
-  await expect(days.getByRole('button', { name: TIME }).first()).toBeVisible();
-  const count = await days.count();
-  for (let i = 1; i < count; i++) {
-    if ((await days.nth(i).getByRole('button', { name: TIME }).count()) >= 2) {
-      const name = (await days.nth(i).getAttribute('aria-label'))!;
-      const day = page.getByRole('region', { name, exact: true });
+  const days = page.getByRole('group', { name: 'Pick a day' }).getByRole('button');
+  await expect(days).toHaveCount(7);
+  const day = page.getByRole('region', { name: 'Pick a time' });
+  for (let i = 1; i < 7; i++) {
+    const button = days.nth(i);
+    await expect(button).not.toHaveAccessibleName(/loading/);
+    if (await button.isDisabled()) continue;
+    await button.click();
+    await expect(button).toHaveAttribute('aria-pressed', 'true');
+    if ((await day.getByRole('button', { name: TIME }).count()) >= 2) {
       return { day, slot: day.getByRole('button', { name: TIME }).first() };
     }
   }
@@ -73,7 +75,7 @@ test.describe('booking, moving and cancelling on the calendar', () => {
     await page.goto('/calendar');
     const { slot } = await firstFreeSlot(page);
     await slot.click();
-    await page.getByRole('button', { name: 'Book this' }).click();
+    await page.getByRole('button', { name: 'Confirm booking' }).click();
     const ticket = page.getByRole('region', { name: 'Booking ticket' });
     await expect(ticket).toContainText(/EC-[A-Z0-9]{6}/);
     const reference = /EC-[A-Z0-9]{6}/.exec((await ticket.textContent()) ?? '')![0];
@@ -114,12 +116,12 @@ test.describe('booking, moving and cancelling on the calendar', () => {
 
     const { day, slot } = await firstFreeSlot(page);
     await slot.click();
-    await page.getByRole('button', { name: 'Book this' }).click();
+    await page.getByRole('button', { name: 'Confirm booking' }).click();
     await expect(page.getByRole('region', { name: 'Booking ticket' })).toBeVisible();
 
     // Another time on the same day.
     await day.getByRole('button', { name: /\d:\d\d (AM|PM)/ }).last().click();
-    await page.getByRole('button', { name: 'Book this' }).click();
+    await page.getByRole('button', { name: 'Confirm booking' }).click();
     await expect(page.getByRole('alert')).toContainText('already have');
 
     expect((await myAppointments(page)).filter((a) => a.status === 'BOOKED')).toHaveLength(1);
