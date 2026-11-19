@@ -1,3 +1,4 @@
+import { flagIfUrgentConversation } from '../guardrails/urgent.js';
 import { HttpException, Injectable } from '@nestjs/common';
 import { DateTime } from 'luxon';
 import { z } from 'zod';
@@ -83,6 +84,15 @@ export const TOOL_INPUTS = {
   handoff_to_staff: z.strictObject({
     reason: z.string().min(1).max(500).describe('What the patient needs, in a sentence, for a member of staff.'),
   }),
+  request_callback: z.strictObject({
+    reason: z.string().min(1).max(500).describe('What the call is about, in a sentence, for a member of staff.'),
+    preferred_time: z
+      .string()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe('When suits the patient, in their words, e.g. "weekday afternoons". Leave out if they have no preference.'),
+  }),
 } as const;
 
 export type ToolName = keyof typeof TOOL_INPUTS;
@@ -132,6 +142,10 @@ export const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
     'Mention an offer once, briefly; never push it.',
   handoff_to_staff:
     'Pass the conversation to clinic staff: medical questions, complaints, anything you are unsure about. No login needed.',
+  request_callback:
+    'Ask clinic staff to call the logged-in patient back; they use the contact details on the account. For: wanting a person, ' +
+    'upset or confused, medical advice or what results mean, a task that failed twice (a tool said suggest_callback), ' +
+    'or too many booking changes. Needs login.',
 };
 
 /** A refusal the model can read and explain. */
@@ -175,8 +189,9 @@ export class ClinicToolsService {
 
   /** The tool inputs to advertise, with the active appointment types as of now. */
   async inputs() {
+    // Staff-only (urgent) types aren't offered: patients can't book them.
     const types = await this.prisma.appointmentType.findMany({
-      where: { active: true },
+      where: { active: true, isUrgent: false },
       select: { code: true, name: true },
       orderBy: { name: 'asc' },
     });
@@ -193,7 +208,10 @@ export class ClinicToolsService {
       return await this.run(name, parsed.data as never, who);
     } catch (error) {
       if (error instanceof ToolError) return { isError: true, data: { error: error.code, message: error.message } };
-      if (error instanceof SchedulingError) return { isError: true, data: { error: error.code, reasons: error.reasons } };
+      if (error instanceof SchedulingError) {
+        const suggestCallback = await this.failedTwice(name, error.code, who);
+        return { isError: true, data: { error: error.code, reasons: error.reasons, ...(suggestCallback ? { suggest_callback: true } : {}) } };
+      }
       if (error instanceof HttpException) return { isError: true, data: error.getResponse() };
       throw error;
     }
@@ -221,6 +239,8 @@ export class ClinicToolsService {
         return this.myOffers(who);
       case 'handoff_to_staff':
         return this.handoff(args, who);
+      case 'request_callback':
+        return this.callback(args, who);
     }
   }
 
@@ -229,7 +249,7 @@ export class ClinicToolsService {
   private async listTypes(): Promise<ToolResult> {
     const [types, doctors] = await Promise.all([
       this.prisma.appointmentType.findMany({
-        where: { active: true },
+        where: { active: true, isUrgent: false },
         include: { steps: true },
         orderBy: { name: 'asc' },
       }),
@@ -350,13 +370,51 @@ export class ClinicToolsService {
     return { data: { status: 'PASSED_TO_STAFF', message: 'A member of staff will follow this up.' } };
   }
 
+  /**
+   * "Offer a person when the same task fails twice" is decided here, not by the model:
+   * the second refusal with the same reason in one conversation (the guardrail log holds
+   * them), or any rate-limit refusal, says suggest_callback.
+   */
+  private async failedTwice(name: ToolName, code: string, who: AgentIdentity): Promise<boolean> {
+    if (code === 'TOO_MANY_CHANGES') return true;
+    if (!who.conversationId || !['book', 'reschedule', 'cancel'].includes(name)) return false;
+    const refusals = await this.prisma.guardrailEvent.count({
+      where: { conversationId: who.conversationId, kind: 'BLOCKED', reasonCode: code },
+    });
+    return refusals >= 2;
+  }
+
   // --- Tools that need a logged-in patient ----------------------------------
+
+  /** A call back from staff (Handoffs page, kind CALLBACK). One open request per patient is enough. */
+  private async callback(args: Record<string, string | undefined>, who: AgentIdentity): Promise<ToolResult> {
+    const patientId = this.patient(who);
+    const patient = await this.prisma.patient.findUniqueOrThrow({ where: { id: patientId }, select: { email: true } });
+    const open = await this.prisma.handoffRequest.findFirst({ where: { patientId, kind: 'CALLBACK', status: 'OPEN' } });
+    if (open) {
+      return { data: { status: 'ALREADY_REQUESTED', message: `A call back is already on the list; staff will contact ${patient.email}.` } };
+    }
+    const request = await this.prisma.handoffRequest.create({
+      data: {
+        kind: 'CALLBACK',
+        patientId,
+        conversationId: who.conversationId,
+        reason: args.reason!,
+        preferredTime: args.preferred_time,
+        createdAt: this.clock.now(),
+      },
+    });
+    // The reason may describe symptoms, so it stays out of the audit log.
+    await this.audit.record({ actor: this.actor(who), action: 'CALLBACK_REQUESTED', entityType: 'HandoffRequest', entityId: request.id });
+    return { data: { status: 'CALLBACK_REQUESTED', message: `Staff will contact ${patient.email}.` } };
+  }
 
   private async book(args: Record<string, string | undefined>, who: AgentIdentity): Promise<ToolResult> {
     const patientId = this.patient(who);
     const start = await this.clinicTime(args.date!, args.time!);
     const doctorId = args.doctor ? await this.doctorId(args.doctor) : undefined;
     const appointment = await this.booking.book(patientId, { typeCode: args.type!, start, doctorId }, this.clock.now(), this.actor(who));
+    await flagIfUrgentConversation(this.prisma, who.conversationId, appointment.id);
     return this.ticket(appointment.id, who, 'BOOKED');
   }
 
@@ -445,7 +503,7 @@ export class ClinicToolsService {
 
   private patient(who: AgentIdentity): string {
     if (!who.patientId) {
-      throw new ToolError('LOGIN_REQUIRED', 'The visitor needs to log in on the page first (email and a 6-digit code).');
+      throw new ToolError('LOGIN_REQUIRED', 'The visitor needs to log in on the page first (or create an account).');
     }
     return who.patientId;
   }

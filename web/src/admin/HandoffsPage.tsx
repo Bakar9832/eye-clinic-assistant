@@ -6,13 +6,21 @@ import { clinicTime } from './staff-api';
 interface Handoff {
   id: string;
   reason: string;
+  kind: 'HANDOFF' | 'CALLBACK' | 'URGENT';
+  preferredTime: string | null;
   status: 'OPEN' | 'CLOSED';
   createdAt: string;
   conversationId: string | null;
   patient: { fullName: string | null; email: string } | null;
 }
 
-/** What the assistant passed to a person: medical questions, complaints, anything unclear. */
+const KIND = {
+  URGENT: { label: 'Urgent', style: 'bg-red-600 text-white' },
+  CALLBACK: { label: 'Call back', style: 'bg-sky-100 text-sky-800' },
+  HANDOFF: { label: 'Question', style: 'bg-slate-100 text-slate-700' },
+} as const;
+
+/** What needs a person: urgent symptoms (first), call-back requests, and questions the assistant passed on. */
 export function HandoffsPage() {
   const { clinic } = useApp();
   const queryClient = useQueryClient();
@@ -28,12 +36,14 @@ export function HandoffsPage() {
       {handoffs.data?.length === 0 && <p className="text-slate-500">Nothing waiting.</p>}
       <ul className="space-y-2">
         {handoffs.data?.map((h) => (
-          <li key={h.id} className="rounded-lg border bg-white p-3">
+          <li key={h.id} aria-label={`${KIND[h.kind].label} ${h.patient?.fullName ?? 'Guest'}`} className={`rounded-lg border bg-white p-3 ${h.kind === 'URGENT' ? 'border-red-300' : ''}`}>
             <div className="flex flex-wrap items-baseline gap-x-3 text-sm text-slate-500">
+              <span className={`rounded px-2 py-0.5 text-xs font-medium ${KIND[h.kind].style}`}>{KIND[h.kind].label}</span>
               <span>{clinic ? clinicTime(h.createdAt, clinic.timezone, 'ccc d LLL h:mm a') : ''}</span>
               <span>{h.patient ? `${h.patient.fullName ?? '(no name)'} · ${h.patient.email}` : 'Guest (not logged in)'}</span>
             </div>
             <p className="my-1">{h.reason}</p>
+            {h.preferredTime && <p className="mb-1 text-sm text-slate-600">Best time to call: {h.preferredTime}</p>}
             <button onClick={() => close.mutate(h.id)} disabled={close.isPending} className="rounded border border-slate-300 px-2 py-0.5 text-sm">
               Mark as handled
             </button>

@@ -31,6 +31,9 @@ class TurnContext(ApiModel):
     weekday: str  # e.g. "Tuesday"
     viewer_timezone: str
     logged_in: bool
+    # Urgent eye symptoms were mentioned in this conversation (found by the API in code;
+    # staff already alerted). Defaults to False for callers that don't send it.
+    urgent_symptoms: bool = False
 
 
 class TurnRequest(ApiModel):

@@ -63,22 +63,27 @@ export class StaffClinicController {
         // For a doctor: is this one of their own exams (the only ones they may record)?
         examinedByMe: staff.resourceId !== null && examOf(a)?.id === staff.resourceId,
         hasOutcome: a.outcome !== null,
+        // Booked in a chat that mentioned urgent symptoms: staff should contact the patient.
+        attentionReason: a.attentionReason,
       })),
     };
   }
 
-  /** What the agent passed to a person, newest first. Open ones by default. */
+  /** What needs a person: urgent alerts first, then callbacks and handoffs, newest first. Open ones by default. */
   @Get('handoffs')
   async handoffs(@Query('status') status?: string) {
     const requests = await this.prisma.handoffRequest.findMany({
       where: { status: status === 'CLOSED' ? 'CLOSED' : 'OPEN' },
-      orderBy: { createdAt: 'desc' },
+      // The enum's order is HANDOFF, CALLBACK, URGENT: descending puts URGENT first.
+      orderBy: [{ kind: 'desc' }, { createdAt: 'desc' }],
       take: 100,
       include: { patient: { select: { fullName: true, email: true } } },
     });
     return requests.map((h) => ({
       id: h.id,
       reason: h.reason,
+      kind: h.kind,
+      preferredTime: h.preferredTime,
       status: h.status,
       createdAt: h.createdAt.toISOString(),
       conversationId: h.conversationId,

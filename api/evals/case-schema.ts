@@ -28,6 +28,7 @@ const TOOLS = [
   'get_my_outcome',
   'get_offers',
   'handoff_to_staff',
+  'request_callback',
 ] as const;
 const CARD_TYPES = ['doctor_note', 'dob_prompt', 'ticket', 'booking_offer'] as const;
 

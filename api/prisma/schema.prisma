@@ -299,6 +299,9 @@ model Appointment {
   status            AppointmentStatus    @default(BOOKED)
   createdAt         DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
   cancelledAt       DateTime?            @map("cancelled_at") @db.Timestamptz(3)
+  /// Set when it was booked in a chat where urgent symptoms were mentioned: staff should
+  /// look at it ("Attention needed"). Urgency never changes the slot or the queue.
+  attentionReason   String?              @map("attention_reason")
   allocations       ResourceAllocation[]
   outcome           Outcome?
   notifications     Notification[]
@@ -398,6 +401,16 @@ enum HandoffStatus {
   CLOSED
 }
 
+/// Why a person is needed. URGENT ones are listed first for staff.
+enum HandoffKind {
+  /// The agent passed on a question it may not answer (medical advice, complaints, ...).
+  HANDOFF
+  /// The patient asked for a call back (request_callback). Staff use the account email.
+  CALLBACK
+  /// Urgent eye symptoms were mentioned in the chat (detected in code, not by the model).
+  URGENT
+}
+
 /// The agent passing something to a person: medical questions, complaints, anything unclear.
 model HandoffRequest {
   id             String        @id @default(uuid()) @db.Uuid
@@ -407,6 +420,9 @@ model HandoffRequest {
   conversationId String?       @map("conversation_id") @db.Uuid
   conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
   reason         String
+  kind           HandoffKind   @default(HANDOFF)
+  /// What the patient said suits them for a call back, e.g. "weekday afternoons". Free text.
+  preferredTime  String?       @map("preferred_time")
   status         HandoffStatus @default(OPEN)
   createdAt      DateTime      @map("created_at") @db.Timestamptz(3)
 

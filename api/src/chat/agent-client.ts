@@ -16,6 +16,8 @@ export interface AgentTurnRequest {
     weekday: string;
     viewerTimezone: string;
     loggedIn: boolean;
+    /** Urgent eye symptoms were mentioned in this conversation (found in code; staff already alerted). */
+    urgentSymptoms: boolean;
   };
 }
 

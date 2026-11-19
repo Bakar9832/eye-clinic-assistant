@@ -165,8 +165,8 @@ describe('A6. handoffs', () => {
     const api = staffApi(RECEPTION, {
       'GET /staff/handoffs': {
         body: [
-          { id: 'h1', reason: 'Asks which eye drops to use.', status: 'OPEN', createdAt: '2030-01-07T05:00:00.000Z', conversationId: 'c', patient: { fullName: 'Demo Patient', email: 'demo.patient@example.com' } },
-          { id: 'h2', reason: 'Complaint about parking.', status: 'OPEN', createdAt: '2030-01-07T06:00:00.000Z', conversationId: 'c2', patient: null },
+          { id: 'h1', reason: 'Asks which eye drops to use.', kind: 'HANDOFF', preferredTime: null, status: 'OPEN', createdAt: '2030-01-07T05:00:00.000Z', conversationId: 'c', patient: { fullName: 'Demo Patient', email: 'demo.patient@example.com' } },
+          { id: 'h2', reason: 'Complaint about parking.', kind: 'HANDOFF', preferredTime: null, status: 'OPEN', createdAt: '2030-01-07T06:00:00.000Z', conversationId: 'c2', patient: null },
         ],
       },
       'POST /staff/handoffs/h1/close': { body: { id: 'h1', status: 'CLOSED' } },
@@ -177,6 +177,36 @@ describe('A6. handoffs', () => {
     expect(screen.getByText('Guest (not logged in)')).toBeInTheDocument();
     await userEvent.click(screen.getAllByRole('button', { name: 'Mark as handled' })[0]);
     expect(api.calls.some((c) => c.method === 'POST' && c.path === '/staff/handoffs/h1/close')).toBe(true);
+  });
+});
+
+describe('A6c. urgent alerts, call backs and "attention needed"', () => {
+  it('shows each kind with its badge and the best time to call', async () => {
+    staffApi(RECEPTION, {
+      'GET /staff/handoffs': {
+        body: [
+          { id: 'u1', reason: 'Urgent eye symptoms mentioned in the chat (chemical in the eye).', kind: 'URGENT', preferredTime: null, status: 'OPEN', createdAt: '2030-01-07T05:00:00.000Z', conversationId: 'c', patient: { fullName: 'Demo Patient', email: 'demo.patient@example.com' } },
+          { id: 'c1', reason: 'Wants to talk about the results.', kind: 'CALLBACK', preferredTime: 'weekday afternoons', status: 'OPEN', createdAt: '2030-01-07T04:00:00.000Z', conversationId: 'c2', patient: { fullName: 'Test Patient Two', email: 'test.two@example.com' } },
+        ],
+      },
+    });
+    renderApp('/admin/handoffs');
+
+    const urgent = await screen.findByRole('listitem', { name: /Urgent Demo Patient/ });
+    expect(urgent).toHaveTextContent('chemical in the eye');
+    const callback = screen.getByRole('listitem', { name: /Call back Test Patient Two/ });
+    expect(callback).toHaveTextContent('Best time to call: weekday afternoons');
+  });
+
+  it('flags a booking made in an urgent chat on the schedule', async () => {
+    staffApi(RECEPTION, {
+      'GET /staff/schedule': { body: { appointments: [item({ attentionReason: 'Booked in a chat that mentioned urgent eye symptoms: please contact the patient.' })] } },
+    });
+    renderApp('/admin');
+
+    const row = await screen.findByRole('listitem', { name: /Demo Patient/ });
+    expect(within(row).getByText('Attention needed')).toBeInTheDocument();
+    expect(row).toHaveTextContent('please contact the patient');
   });
 });
 

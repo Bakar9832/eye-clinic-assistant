@@ -62,7 +62,7 @@ describe('T1. the agent token', () => {
     await expect(mcpClient(t, tampered)).rejects.toThrow();
 
     const client = await mcpClient(t, token);
-    expect((await client.listTools()).tools.length).toBe(10);
+    expect((await client.listTools()).tools.length).toBe(11);
 
     t.clock.advanceMinutes(6);
     await expect(mcpClient(t, token)).rejects.toThrow();
@@ -95,6 +95,7 @@ describe('T3. no tool can be told whose data to use', () => {
         'handoff_to_staff',
         'list_appointment_types',
         'propose_booking',
+        'request_callback',
         'reschedule',
       ].sort(),
     );

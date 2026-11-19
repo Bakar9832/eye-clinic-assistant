@@ -14,6 +14,7 @@ import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
 import { IsTimezone } from '../http/is-timezone.js';
 import { doctorOf, ticketCard } from '../mcp/clinic-tools.service.js';
+import { flagIfUrgentConversation, screenMessage } from '../guardrails/urgent.js';
 import { AgentClient } from './agent-client.js';
 import { redactDateOfBirth } from './redact.js';
 
@@ -98,6 +99,9 @@ export class ChatController {
       })
     ).reverse();
 
+    // Urgent symptoms and urgency claims are handled in code before the model sees the message.
+    const { urgent } = await screenMessage(this.prisma, { message: body.message, patientId: owner.patientId, conversationId: conversation.id, at: now });
+
     const settings = await clinicSettings(this.prisma);
     const patient = owner.patientId ? await this.prisma.patient.findUnique({ where: { id: owner.patientId } }) : null;
     const viewerTimezone = body.viewerTimezone ?? patient?.timezone ?? settings.timezone;
@@ -120,6 +124,7 @@ export class ChatController {
           weekday: today.toFormat('cccc'),
           viewerTimezone,
           loggedIn: owner.patientId !== null,
+          urgentSymptoms: urgent,
         },
       });
     } catch (error) {
@@ -160,8 +165,9 @@ export class ChatController {
       me.id,
       { typeCode: body.typeCode, start: new Date(body.start), doctorId: body.doctorId },
       this.clock.now(),
-      me,
+      { ...me, conversationId: id },
     );
+    await flagIfUrgentConversation(this.prisma, id, booked.id);
     const a = await this.prisma.appointment.findUniqueOrThrow({
       where: { id: booked.id },
       include: { appointmentType: true, allocations: { include: { resource: true } } },

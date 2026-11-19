@@ -37,6 +37,7 @@ describe('a chat turn', () => {
       weekday: 'Tuesday',
       viewerTimezone: 'Europe/London',
       loggedIn: true,
+      urgentSymptoms: false,
     });
     expect(turn.agentToken).toMatch(/^[\w-]+\.[\w-]+$/);
     // The agent gets the token separately: it is not part of the conversation text.

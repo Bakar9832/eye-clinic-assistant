@@ -22,6 +22,8 @@ export interface ScheduleItem {
   doctor: string | null;
   examinedByMe: boolean;
   hasOutcome: boolean;
+  /** Booked in a chat that mentioned urgent symptoms. */
+  attentionReason?: string | null;
 }
 
 export interface OutcomeView {

@@ -45,7 +45,13 @@ export function SchedulePage() {
                   {a.status.toLowerCase()}
                 </span>
                 <span className="font-mono text-xs text-slate-400">{a.reference}</span>
+                {a.attentionReason && (
+                  <span title={a.attentionReason} className="rounded bg-red-100 px-1.5 text-xs font-medium text-red-800">
+                    Attention needed
+                  </span>
+                )}
               </div>
+              {a.attentionReason && <p className="text-sm text-red-800">{a.attentionReason}</p>}
               {canRecord && <OutcomeEditor appointmentId={a.id} day={day} />}
               {canCorrect && <OutcomeEditor appointmentId={a.id} day={day} existing />}
             </li>
