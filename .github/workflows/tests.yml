@@ -103,6 +103,8 @@ jobs:
     env:
       # Throwaway values for this run only. The API's other settings are in e2e/playwright.config.ts.
       E2E_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/eyeClinicAssistant_e2e?schema=public
+      # The API's install step (prisma generate) needs one set; the same e2e database.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/eyeClinicAssistant_e2e?schema=public
       SEED_PATIENT_PASSWORD: ci-only-patient-password
       SEED_STAFF_PASSWORD: ci-only-staff-password
     steps:
