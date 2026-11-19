@@ -56,6 +56,13 @@ model ClinicSetting {
   /// Chats are deleted this many days after their last message; closed handoffs this
   /// many days after they were created. The daily cleanup (RetentionService) applies it.
   chatRetentionDays Int @default(30) @map("chat_retention_days")
+  /// Booked, upcoming appointments one patient may hold on one clinic day (0 = no limit).
+  /// Staff bookings don't count against it.
+  maxAppointmentsPerDay Int @default(1) @map("max_appointments_per_day")
+  /// A patient may book, move or cancel at most this many times within the window
+  /// (counted from the audit log). Staff are exempt.
+  bookingActionLimit     Int @default(3) @map("booking_action_limit")
+  bookingActionWindowMin Int @default(10) @map("booking_action_window_min")
 
   @@map("clinic_settings")
 }

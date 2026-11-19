@@ -54,6 +54,8 @@ const TWO = 'test.two@example.com';
 const THREE = 'test.three@example.com';
 
 it('B1. the query count does not grow with the number of appointments', async () => {
+  // Each patient books twice on one day here, to fill the day: lift the per-day limit (test setup only).
+  await t.prisma.clinicSetting.update({ where: { id: 1 }, data: { maxAppointmentsPerDay: 0 } });
   await bookAll([
     [DEMO, 'FOLLOW_UP', '09:00', 'ayesha'],
     [TWO, 'FOLLOW_UP', '12:00', 'bilal'],

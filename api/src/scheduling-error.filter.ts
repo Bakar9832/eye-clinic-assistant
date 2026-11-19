@@ -15,6 +15,8 @@ const STATUS: Record<SchedulingErrorCode, HttpStatus> = {
   PROFILE_INCOMPLETE: HttpStatus.FORBIDDEN,
   OVERRIDE_REQUIRED: HttpStatus.CONFLICT,
   ALREADY_BOOKED: HttpStatus.CONFLICT,
+  STAFF_ONLY_TYPE: HttpStatus.FORBIDDEN,
+  TOO_MANY_CHANGES: HttpStatus.TOO_MANY_REQUESTS,
 };
 
 /** Turns a SchedulingError into a JSON response with its reasons (a GraphQL error on the staff dashboard). */

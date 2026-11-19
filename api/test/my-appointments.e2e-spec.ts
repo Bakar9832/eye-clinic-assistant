@@ -148,6 +148,32 @@ describe('moving and cancelling', () => {
   });
 });
 
+describe('patient booking rules apply to the calendar too', () => {
+  const on = (day: string, typeCode = 'FOLLOW_UP') => ({
+    typeCode,
+    start: DateTime.fromISO(`${day}T09:00`, { zone: ZONE }).toUTC().toISO(),
+  });
+
+  it('G2. one appointment a day, no urgent visits, and at most 3 changes in 10 minutes', async () => {
+    const browser = await login(t, DEMO);
+    const monday = (await browser.post('/me/appointments').send(on('2030-01-07')).expect(201)).body;
+
+    const sameDay = await browser.post('/me/appointments').send({ ...on('2030-01-07', 'SCAN_ONLY'), start: at('11:00') }).expect(409);
+    expect(sameDay.body.error).toBe('ALREADY_BOOKED');
+    const urgent = await browser.post('/me/appointments').send(on('2030-01-08', 'URGENT_VISIT')).expect(403);
+    expect(urgent.body.error).toBe('STAFF_ONLY_TYPE');
+
+    // Book (1, above), move (2), cancel (3): the 4th change within 10 minutes is refused.
+    await browser.post(`/me/appointments/${monday.id}/reschedule`).send({ start: at('11:00') }).expect(200);
+    await browser.delete(`/me/appointments/${monday.id}`).set('Content-Type', 'application/json').expect(200);
+    const fourth = await browser.post('/me/appointments').send(on('2030-01-09')).expect(429);
+    expect(fourth.body.error).toBe('TOO_MANY_CHANGES');
+
+    t.clock.advanceMinutes(11);
+    await browser.post('/me/appointments').send(on('2030-01-09')).expect(201);
+  });
+});
+
 describe('audit log', () => {
   it('D1. login, failed login, book, move and cancel are recorded against the patient from the session', async () => {
     await t.http().post('/auth/login').send({ email: DEMO, password: 'wrong-password' }).expect(401);

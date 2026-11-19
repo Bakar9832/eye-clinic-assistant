@@ -92,13 +92,13 @@ export type ToolName = keyof typeof TOOL_INPUTS;
  * name. With only a format and one example, a small model copied the example
  * (ROUTINE_EYE_TEST) for a follow-up instead of looking the code up. The codes are read
  * from the database, so a new appointment type reaches the tools without a code change.
+ * Listed, not enforced as an enum: an unknown service ("dental") then reaches the booking
+ * code, whose refusal says in plain words that the clinic only offers eye care and what
+ * it does offer. The schema's own enum error was protocol jargon.
  */
 function toolInputs(types: { code: string; name: string }[]) {
   if (types.length === 0) return TOOL_INPUTS;
-  const [first, ...rest] = types.map((t) => t.code);
-  const type = z
-    .enum([first, ...rest])
-    .describe(`The appointment type code: ${types.map((t) => `${t.code} = ${t.name}`).join(', ')}.`);
+  const type = TYPE.describe(`The appointment type code: ${types.map((t) => `${t.code} = ${t.name}`).join(', ')}.`);
   return {
     ...TOOL_INPUTS,
     check_availability: TOOL_INPUTS.check_availability.extend({ type }),

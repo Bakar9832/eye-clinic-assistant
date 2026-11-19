@@ -1,13 +1,13 @@
 // Database tests: run against TEST_DATABASE_URL, which is wiped and re-seeded before each test.
 
 import { seedClinic } from '../../prisma/clinic-data.js';
-import { AuditService, SYSTEM } from '../audit/audit.service.js';
+import { AuditService, SYSTEM, type Actor } from '../audit/audit.service.js';
 import { AvailabilityService } from '../availability/availability.service.js';
 import { KARACHI, LONG_AGO, MON, local, startTimes } from '../availability/test-fixtures.js';
 import { isOverlapViolation } from '../prisma/db-errors.js';
 import { SchedulingError } from '../scheduling-error.js';
 import { testPrisma } from '../testing-db.js';
-import { SystemClock } from '../clock.js';
+import { SystemClock, type Clock } from '../clock.js';
 import { BookingService } from './booking.service.js';
 
 const prisma = testPrisma();
@@ -249,7 +249,7 @@ describe('BookingService.reschedule', () => {
   });
 });
 
-describe('One upcoming booking per type and day, for patients', () => {
+describe('One upcoming booking per day (a clinic setting), for patients', () => {
   const followUp = (time: string, now = LONG_AGO, day = MON) =>
     booking.book(clinic.patients.demo.id, { typeCode: 'FOLLOW_UP', start: local(day, time) }, now);
 
@@ -268,13 +268,16 @@ describe('One upcoming booking per type and day, for patients', () => {
     expect(await prisma.appointment.count()).toBe(1);
   });
 
-  it('D2. a different type the same day, or the same type another day, is fine', async () => {
+  it('D2. any second appointment that day is refused, whatever its type; another day is fine', async () => {
     await followUp('09:00');
 
-    await booking.book(clinic.patients.demo.id, { typeCode: 'SCAN_ONLY', start: local(MON, '11:00') }, LONG_AGO);
+    await expectRefusal(
+      booking.book(clinic.patients.demo.id, { typeCode: 'SCAN_ONLY', start: local(MON, '11:00') }, LONG_AGO),
+      'ALREADY_BOOKED',
+    );
     await followUp('09:00', LONG_AGO, '2030-01-08');
 
-    expect(await prisma.appointment.count()).toBe(3);
+    expect(await prisma.appointment.count()).toBe(2);
   });
 
   it('D3. after missing a morning visit, the patient can book again that afternoon', async () => {
@@ -311,6 +314,113 @@ describe('One upcoming booking per type and day, for patients', () => {
     await booking.bookByStaff(clinic.patients.demo.id, { typeCode: 'FOLLOW_UP', start: local(MON, '15:00') }, LONG_AGO, SYSTEM);
 
     expect(await prisma.appointment.count({ where: { patientId: clinic.patients.demo.id } })).toBe(2);
+  });
+
+  it('D7. the limit is a clinic setting: 2 allows a second visit that day, 0 means no limit', async () => {
+    await prisma.clinicSetting.update({ where: { id: 1 }, data: { maxAppointmentsPerDay: 2 } });
+    await followUp('09:00');
+    await followUp('11:00');
+    await expectRefusal(followUp('15:00'), 'ALREADY_BOOKED');
+
+    await prisma.clinicSetting.update({ where: { id: 1 }, data: { maxAppointmentsPerDay: 0 } });
+    await expect(followUp('15:00')).resolves.toMatchObject({ status: 'BOOKED' });
+  });
+
+  it('D8. the refusal suggests moving the existing one, or one Family check-up', async () => {
+    await followUp('09:00');
+    const error = (await followUp('15:00').catch((e: unknown) => e)) as SchedulingError;
+    expect(error.reasons[0].message).toMatch(/move that one/i);
+    expect(error.reasons[0].message).toContain('Family check-up');
+  });
+});
+
+describe('Family check-up and staff-only types', () => {
+  it('F1. a family check-up is one 60-minute appointment: pre-tests, then a paediatric-trained doctor', async () => {
+    const family = await booking.book(clinic.patients.demo.id, { typeCode: 'FAMILY_CHECK_UP', start: local(MON, '10:00') }, LONG_AGO);
+
+    expect(family.endsAt.getTime() - family.startsAt.getTime()).toBe(60 * 60_000);
+    const allocations = await prisma.resourceAllocation.findMany({ where: { appointmentId: family.id }, include: { resource: true } });
+    const doctor = allocations.find((a) => a.resource.kind === 'OPTOMETRIST');
+    expect(doctor?.resource.id).toBe(clinic.resources.ayesha.id); // the only doctor with PAEDIATRIC
+    expect(allocations.find((a) => a.resource.kind === 'TECHNICIAN')).toBeDefined();
+    expect(await prisma.appointment.count()).toBe(1);
+  });
+
+  it('U1. a patient cannot book an urgent visit, however it is asked; staff can', async () => {
+    await expectRefusal(
+      booking.book(clinic.patients.demo.id, { typeCode: 'URGENT_VISIT', start: local(MON, '10:00') }, LONG_AGO),
+      'STAFF_ONLY_TYPE',
+    );
+    expect(await prisma.appointment.count()).toBe(0);
+
+    const urgent = await booking.bookByStaff(clinic.patients.demo.id, { typeCode: 'URGENT_VISIT', start: local(MON, '10:00') }, LONG_AGO, SYSTEM);
+    expect(urgent.status).toBe('BOOKED');
+  });
+
+  it('S1. an unknown service is refused with the list of what the clinic does offer', async () => {
+    const error = (await booking
+      .book(clinic.patients.demo.id, { typeCode: 'DENTAL_CHECK', start: local(MON, '10:00') }, LONG_AGO)
+      .catch((e: unknown) => e)) as SchedulingError;
+
+    expect(error.code).toBe('UNKNOWN_TYPE');
+    expect(error.reasons[0].message).toContain('only offers eye care');
+    expect(error.reasons[0].message).toContain('Routine eye test (ROUTINE_EYE_TEST)');
+    expect(error.reasons[0].message).not.toContain('URGENT_VISIT'); // not something a patient can book
+  });
+});
+
+describe('Booking rate limit (patients only)', () => {
+  // The limit counts audit events, which carry the audit clock's time: control it here.
+  let current = new Date('2030-01-01T05:00:00Z');
+  const clock = { now: () => current } as Clock;
+  const limited = new BookingService(prisma, availability, new AuditService(prisma, clock));
+  const patient = (): Actor => ({ type: 'PATIENT', id: clinic.patients.demo.id });
+  const bookOn = (day: string, actor: Actor = patient()) =>
+    limited.book(clinic.patients.demo.id, { typeCode: 'FOLLOW_UP', start: local(day, '09:00') }, current, actor);
+
+  beforeEach(() => {
+    current = new Date('2030-01-01T05:00:00Z');
+  });
+
+  it('R1. a 4th book/move/cancel within 10 minutes is refused, and allowed again after the window', async () => {
+    const monday = await bookOn('2030-01-07');
+    await limited.reschedule(clinic.patients.demo.id, monday.id, { start: local('2030-01-07', '11:00') }, current, patient());
+    await limited.cancel(clinic.patients.demo.id, monday.id, current, patient());
+
+    await expectRefusal(bookOn('2030-01-08'), 'TOO_MANY_CHANGES');
+    expect(await prisma.appointment.count({ where: { status: 'BOOKED' } })).toBe(0);
+
+    current = new Date(current.getTime() + 11 * 60_000);
+    await expect(bookOn('2030-01-08')).resolves.toMatchObject({ status: 'BOOKED' });
+  });
+
+  it('R2. the limit and window are clinic settings', async () => {
+    await prisma.clinicSetting.update({ where: { id: 1 }, data: { bookingActionLimit: 1, bookingActionWindowMin: 60 } });
+    await bookOn('2030-01-07');
+    await expectRefusal(bookOn('2030-01-08'), 'TOO_MANY_CHANGES');
+
+    current = new Date(current.getTime() + 61 * 60_000);
+    await expect(bookOn('2030-01-08')).resolves.toMatchObject({ status: 'BOOKED' });
+  });
+
+  it("R3. staff and the system are never limited, and their actions don't count against the patient", async () => {
+    const staff: Actor = { type: 'STAFF', id: clinic.staff.reception.id };
+    for (const day of ['2030-01-07', '2030-01-08', '2030-01-09']) {
+      await limited.bookByStaff(clinic.patients.demo.id, { typeCode: 'FOLLOW_UP', start: local(day, '09:00') }, current, staff);
+    }
+    await bookOn('2030-01-10', SYSTEM);
+    await bookOn('2030-01-11', SYSTEM);
+
+    // The patient's own first action still goes through.
+    await expect(bookOn('2030-01-14')).resolves.toMatchObject({ status: 'BOOKED' });
+  });
+
+  it('R4. the refusal offers a call from the clinic', async () => {
+    await bookOn('2030-01-07');
+    await bookOn('2030-01-08');
+    await bookOn('2030-01-09');
+    const error = (await bookOn('2030-01-10').catch((e: unknown) => e)) as SchedulingError;
+    expect(error.reasons[0].message).toMatch(/call from the clinic/i);
   });
 });
 

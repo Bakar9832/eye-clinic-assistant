@@ -172,6 +172,18 @@ export async function seedClinic(prisma: PrismaClient, timezone: string) {
       steps: numbered([pretest, exam(10, 30, Skill.PAEDIATRIC)]),
     },
     {
+      // One longer visit for a family (one account books it), instead of several same-day
+      // bookings. Children are usually part of it, so the doctor needs the paediatric skill.
+      code: 'FAMILY_CHECK_UP',
+      name: 'Family check-up',
+      typicalMin: 55,
+      annualReminder: true,
+      prepInstructions:
+        'For up to 3 family members. A parent or guardian must come with any children. ' +
+        'Each person should bring their current glasses or contact lenses and a list of any medicines they take.',
+      steps: numbered([{ ...pretest, durationMin: 20 }, exam(20, 40, Skill.PAEDIATRIC)]),
+    },
+    {
       code: 'URGENT_VISIT',
       name: 'Urgent visit',
       typicalMin: 15,

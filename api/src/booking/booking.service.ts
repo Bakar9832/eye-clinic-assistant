@@ -45,9 +45,16 @@ export class BookingService {
     private readonly audit: AuditService,
   ) {}
 
+  /**
+   * A patient books for themselves (chat, calendar, or the seed). The patient rules apply:
+   * no staff-only types, the per-day limit and, for the patient's own actions, the rate
+   * limit. Staff book through bookByStaff, which skips them.
+   */
   async book(patientId: string, request: BookingRequest, now = new Date(), actor: Actor = SYSTEM) {
     await this.requireCompleteProfile(patientId);
-    await this.refuseSameTypeSameDay(patientId, request.typeCode, request.start, now);
+    await this.refuseStaffOnlyType(request.typeCode);
+    await this.refuseTooManyChanges(patientId, now, actor);
+    await this.refuseOverDailyLimit(patientId, request.start, now);
     const query = { typeCode: request.typeCode, day: await this.clinicDay(request.start), doctorId: request.doctorId, now };
     return this.placeOnSlot(query, request.start, now, (slot, typeId) => this.createAppointment(patientId, typeId, slot, actor));
   }
@@ -118,7 +125,8 @@ export class BookingService {
     });
     if (!appointment) throw notFound();
     if (appointment.status !== 'BOOKED' || appointment.startsAt <= now) throw notChangeable();
-    await this.refuseSameTypeSameDay(patientId, appointment.appointmentType.code, request.start, now, appointmentId);
+    await this.refuseTooManyChanges(patientId, now, actor);
+    await this.refuseOverDailyLimit(patientId, request.start, now, appointmentId);
 
     const doctorId =
       request.doctorId ?? appointment.allocations.find((a) => a.resource.kind === 'OPTOMETRIST')?.resourceId;
@@ -165,6 +173,7 @@ export class BookingService {
   /** A patient cancels one of their own future appointments. */
   async cancel(patientId: string, appointmentId: string, now = new Date(), actor: Actor = SYSTEM) {
     if (!UUID.test(appointmentId)) throw notFound();
+    await this.refuseTooManyChanges(patientId, now, actor);
 
     return this.prisma.$transaction(async (tx) => {
       const appointment = await tx.appointment.findFirst({ where: { id: appointmentId, patientId } });
@@ -237,41 +246,89 @@ export class BookingService {
   }
 
   /**
-   * A patient can't hold two upcoming bookings of the same type on one clinic day: it is
-   * almost always a mistake (the agent once "moved" an appointment by booking a second
-   * one). Only upcoming BOOKED ones count, so after missing a 10:00 visit the patient can
-   * still book 15:00. The refusal names the existing booking, so it can be moved instead.
+   * At most ClinicSetting.maxAppointmentsPerDay upcoming BOOKED appointments per patient
+   * on one clinic day, of any type (0 = no limit). A second one is almost always a
+   * mistake (the agent once "moved" an appointment by booking another), and a family
+   * books one Family check-up instead. Only upcoming BOOKED ones count, so after missing
+   * a 10:00 visit the patient can still book 15:00. The refusal names the existing
+   * booking, so it can be moved instead.
    *
-   * Staff bookings skip this check. Known limitation: one account per family, so a parent
-   * booking two children's exams on one day needs reception (or, later, a single longer
-   * "family check-up" type). Not race-proof like double booking: two simultaneous
+   * Staff bookings skip this check. Not race-proof like double booking: two simultaneous
    * requests could both pass, which costs a cancellation, not a clash.
    */
-  private async refuseSameTypeSameDay(patientId: string, typeCode: string, start: Date, now: Date, ignoreId?: string) {
-    const { timezone } = await clinicSettings(this.prisma);
+  private async refuseOverDailyLimit(patientId: string, start: Date, now: Date, ignoreId?: string) {
+    const { timezone, maxAppointmentsPerDay } = await clinicSettings(this.prisma);
+    if (maxAppointmentsPerDay <= 0) return;
     const day = DateTime.fromJSDate(start, { zone: timezone }).startOf('day');
-    const existing = await this.prisma.appointment.findFirst({
+    const sameDay = await this.prisma.appointment.findMany({
       where: {
         patientId,
         status: 'BOOKED',
-        appointmentType: { code: typeCode },
         startsAt: { gt: now, gte: day.toJSDate(), lt: day.plus({ days: 1 }).toJSDate() },
         ...(ignoreId ? { id: { not: ignoreId } } : {}),
       },
       include: { appointmentType: true },
       orderBy: { startsAt: 'asc' },
     });
-    if (existing) {
-      const time = DateTime.fromJSDate(existing.startsAt, { zone: timezone }).toFormat('h:mm a');
-      throw new SchedulingError('ALREADY_BOOKED', [
-        {
-          code: 'ALREADY_BOOKED',
-          message:
-            `You already have a ${existing.appointmentType.name} at ${time} that day (${existing.reference}). ` +
-            'Move that one instead of booking another.',
-        },
-      ]);
-    }
+    if (sameDay.length < maxAppointmentsPerDay) return;
+
+    const [existing] = sameDay;
+    const time = DateTime.fromJSDate(existing.startsAt, { zone: timezone }).toFormat('h:mm a');
+    throw new SchedulingError('ALREADY_BOOKED', [
+      {
+        code: 'ALREADY_BOOKED',
+        message:
+          `You already have a ${existing.appointmentType.name} at ${time} that day (${existing.reference}). ` +
+          'You can move that one instead. For several family members, book one Family check-up.',
+      },
+    ]);
+  }
+
+  /**
+   * Urgent visits are for staff to give after triage. A patient saying "urgent" or
+   * "emergency" never unlocks them or moves anyone up the queue; urgency is a flag for
+   * staff, not a priority the patient can set.
+   */
+  private async refuseStaffOnlyType(typeCode: string) {
+    const type = await this.prisma.appointmentType.findUnique({ where: { code: typeCode } });
+    if (!type?.isUrgent) return; // unknown types are refused later, with the list of services
+    throw new SchedulingError('STAFF_ONLY_TYPE', [
+      {
+        code: 'STAFF_ONLY_TYPE',
+        message:
+          `${type.name}s are arranged by the clinic's staff. ` +
+          'For sudden vision loss, severe pain or an eye injury, go to the nearest emergency department now; ' +
+          'otherwise book a regular appointment and staff will review it.',
+      },
+    ]);
+  }
+
+  /**
+   * At most bookingActionLimit book/move/cancel actions by the patient within
+   * bookingActionWindowMin minutes, counted from the audit log (so it covers chat and the
+   * calendar alike). Only the patient's own actions count and are limited: staff and the
+   * seed are exempt.
+   */
+  private async refuseTooManyChanges(patientId: string, now: Date, actor: Actor) {
+    if (actor.type !== 'PATIENT') return;
+    const { bookingActionLimit, bookingActionWindowMin } = await clinicSettings(this.prisma);
+    const recent = await this.prisma.auditEvent.count({
+      where: {
+        actorType: 'PATIENT',
+        actorId: patientId,
+        action: { in: ['APPOINTMENT_BOOKED', 'APPOINTMENT_RESCHEDULED', 'APPOINTMENT_CANCELLED'] },
+        at: { gt: new Date(now.getTime() - bookingActionWindowMin * 60_000) },
+      },
+    });
+    if (recent < bookingActionLimit) return;
+    throw new SchedulingError('TOO_MANY_CHANGES', [
+      {
+        code: 'TOO_MANY_CHANGES',
+        message:
+          `You've made ${recent} booking changes in the last ${bookingActionWindowMin} minutes. ` +
+          'Please wait a little, or ask for a call from the clinic and staff will sort it out with you.',
+      },
+    ]);
   }
 
   /** The clinic-local day a start time falls on. */

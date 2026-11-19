@@ -114,10 +114,12 @@ describe('T3b. appointment types the model can choose from', () => {
     const { tools } = await client.listTools();
 
     for (const name of ['book', 'check_availability']) {
-      const type = tools.find((tool) => tool.name === name)!.inputSchema.properties!.type as { enum: string[]; description: string };
-      expect(type.enum, name).toContain('FOLLOW_UP');
-      expect(type.enum, name).toContain('CHILD_EYE_EXAM');
+      // Listed in the description, not enforced as an enum: an unknown service then gets the
+      // booking code's plain refusal ("this clinic only offers eye care") instead of schema jargon.
+      const type = tools.find((tool) => tool.name === name)!.inputSchema.properties!.type as { description: string };
       expect(type.description, name).toContain('FOLLOW_UP = Follow-up visit');
+      expect(type.description, name).toContain("CHILD_EYE_EXAM = Child's eye exam");
+      expect(type.description, name).toContain('FAMILY_CHECK_UP = Family check-up');
     }
   });
 
@@ -134,8 +136,8 @@ describe('T3b. appointment types the model can choose from', () => {
     const client = await mcpClient(t, await agentTokenFor(t, t.browser()));
     const { tools } = await client.listTools();
 
-    const type = tools.find((tool) => tool.name === 'book')!.inputSchema.properties!.type as { enum: string[] };
-    expect(type.enum).not.toContain('SCAN_ONLY');
+    const type = tools.find((tool) => tool.name === 'book')!.inputSchema.properties!.type as { description: string };
+    expect(type.description).not.toContain('SCAN_ONLY');
   });
 });
 
@@ -174,6 +176,33 @@ describe('booking through the agent', () => {
     const saved = await t.prisma.appointment.findUniqueOrThrow({ where: { reference: data.reference as string } });
     expect(saved.patientId).toBe(clinic.patients.demo.id);
     expect(cardsOf(result)[0]).toMatchObject({ type: 'ticket', reference: data.reference });
+  });
+
+  it('G1. the book tool refuses an urgent visit and a service the clinic does not offer, with clear errors', async () => {
+    const { client } = await asPatient();
+
+    const urgent = await call(client, 'book', { type: 'URGENT_VISIT', date: MON, time: '10:00' });
+    expect(urgent.isError).toBe(true);
+    expect(toolData(urgent).error).toBe('STAFF_ONLY_TYPE');
+
+    const dental = await call(client, 'book', { type: 'DENTAL_CHECK_UP', date: MON, time: '10:00' });
+    expect(dental.isError).toBe(true);
+    const { error, reasons } = toolData(dental) as { error: string; reasons: { message: string }[] };
+    expect(error).toBe('UNKNOWN_TYPE');
+    expect(reasons[0].message).toContain('only offers eye care');
+
+    expect(await t.prisma.appointment.count()).toBe(0);
+  });
+
+  it('G1b. a second booking the same day is refused by the tool, naming the one to move instead', async () => {
+    const { client } = await asPatient();
+    const first = toolData(await call(client, 'book', { type: 'FOLLOW_UP', date: MON, time: '10:00' }));
+    const second = await call(client, 'book', { type: 'CONTACT_LENS_FITTING', date: MON, time: '14:00' });
+
+    expect(second.isError).toBe(true);
+    const { error, reasons } = toolData(second) as { error: string; reasons: { message: string }[] };
+    expect(error).toBe('ALREADY_BOOKED');
+    expect(reasons[0].message).toContain(first.reference as string);
   });
 
   it('T4b. an extra patientId argument is refused and nothing is booked', async () => {

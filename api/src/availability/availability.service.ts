@@ -75,8 +75,15 @@ export class AvailabilityService {
       include: { steps: { orderBy: { position: 'asc' } } },
     });
     if (!type) {
+      // Scope guardrail: only the clinic's own eye-care services can be booked.
+      const offered = await this.prisma.appointmentType.findMany({ where: { active: true, isUrgent: false }, orderBy: { name: 'asc' } });
       throw new SchedulingError('UNKNOWN_TYPE', [
-        { code: 'UNKNOWN_TYPE', message: `There is no appointment type "${typeCode}".` },
+        {
+          code: 'UNKNOWN_TYPE',
+          message:
+            `"${typeCode}" is not a service here. This clinic only offers eye care: ` +
+            `${offered.map((t) => `${t.name} (${t.code})`).join(', ')}.`,
+        },
       ]);
     }
 
