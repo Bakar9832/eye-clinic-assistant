@@ -12,13 +12,13 @@ import { TimeText } from './TimeText';
  */
 export function DoctorNoteCard({ card }: { card: Extract<Card, { type: 'doctor_note' }> }) {
   return (
-    <section aria-label="Doctor's note" className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm">
+    <section aria-label="Doctor's note" className="rounded-lg border border-line bg-white p-4">
       <header className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="font-semibold text-brand-800">Note from {card.doctorName}</h3>
+        <h3 className="text-ink">Note from {card.doctorName}</h3>
         <span className="text-sm text-slate-500">
           {DateTime.fromISO(card.recordedAt).toFormat('d LLL yyyy')}
           {card.edited && card.editedAt && (
-            <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+            <span className="ml-2 rounded bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-amber-800">
               Edited {DateTime.fromISO(card.editedAt).toFormat('d LLL yyyy')}
             </span>
           )}
@@ -36,9 +36,9 @@ export function DoctorNoteCard({ card }: { card: Extract<Card, { type: 'doctor_n
 
 export function TicketCard({ card }: { card: Extract<Card, { type: 'ticket' }> }) {
   return (
-    <section aria-label="Booking ticket" className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm">
+    <section aria-label="Booking ticket" className="rounded-lg border border-line bg-white p-4">
       <p className="text-sm text-slate-500">Booking reference</p>
-      <p className="font-mono text-xl font-semibold tracking-wider text-brand-800">{card.reference}</p>
+      <p className="font-mono text-xl font-semibold tracking-wider text-ink">{card.reference}</p>
       <p className="mt-2">
         <TimeText iso={card.start} />
         {card.doctor && <span> with {card.doctor}</span>}
@@ -81,10 +81,10 @@ export function DobCard({ onVerified }: { onVerified: () => void }) {
     }
   }
 
-  if (done) return <p className="text-sm text-emerald-700">Date of birth confirmed.</p>;
+  if (done) return <p className="text-sm text-success">Date of birth confirmed.</p>;
 
   return (
-    <form onSubmit={submit} aria-label="Confirm your date of birth" className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm">
+    <form onSubmit={submit} aria-label="Confirm your date of birth" className="rounded-lg border border-line bg-white p-4">
       <p className="mb-2 font-medium">Confirm your date of birth to see results</p>
       <p className="mb-3 text-xs text-slate-500">This goes straight to the clinic, not to the chat assistant.</p>
       <div className="flex flex-wrap gap-2">
@@ -94,9 +94,9 @@ export function DobCard({ onVerified }: { onVerified: () => void }) {
           required
           value={dob}
           onChange={(e) => setDob(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1"
+          className="rounded-lg border border-line px-3 py-1.5 tabular-nums"
         />
-        <button disabled={busy || !dob} className="rounded bg-brand-600 px-3 py-1 text-white disabled:opacity-50">
+        <button disabled={busy || !dob} className="rounded-lg bg-ink px-3.5 py-1.5 font-medium text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400">
           Confirm
         </button>
       </div>
@@ -114,8 +114,8 @@ export type Offer = Extract<Card, { type: 'booking_offer' }>;
  */
 function BookingOfferCard({ card, actions }: { card: Offer; actions: OfferActions }) {
   return (
-    <section aria-label="Booking offer" className="rounded-lg border border-brand-100 bg-white p-4 shadow-sm">
-      <p className="font-medium text-brand-800">{card.typeName}</p>
+    <section aria-label="Booking offer" className="rounded-lg border border-line bg-white p-4">
+      <p className="font-medium text-ink">{card.typeName}</p>
       <p className="mt-1">
         <TimeText iso={card.start} />
         {card.doctor && <span> with {card.doctor}</span>}
@@ -124,14 +124,14 @@ function BookingOfferCard({ card, actions }: { card: Offer; actions: OfferAction
         <button
           disabled={!actions.active}
           onClick={() => actions.onConfirm(card)}
-          className="rounded bg-brand-600 px-3 py-1.5 text-white disabled:opacity-50"
+          className="rounded-lg bg-ink px-3.5 py-1.5 font-medium text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400"
         >
           Confirm
         </button>
         <button
           disabled={!actions.active}
           onClick={actions.onOtherTime}
-          className="rounded border border-slate-300 px-3 py-1.5 text-slate-700 disabled:opacity-50"
+          className="rounded-lg border border-line px-3.5 py-1.5 text-ink hover:border-slate-400 disabled:opacity-50"
         >
           Choose another time
         </button>
@@ -150,15 +150,15 @@ interface OfferActions {
 /** A stalled chat: one click asks the clinic to call back (logged in), or explains how (guest). */
 function CallbackOfferCard({ card, active, onRequest }: { card: Extract<Card, { type: 'callback_offer' }>; active: boolean; onRequest: () => void }) {
   return (
-    <section aria-label="Call back offer" className="space-y-2 rounded-lg border border-sky-200 bg-sky-50 p-4">
-      <p className="font-medium text-sky-900">Would it be easier to talk to someone?</p>
+    <section aria-label="Call back offer" className="space-y-2 rounded-lg border border-line bg-white p-4">
+      <p className="font-medium text-ink">Would it be easier to talk to someone?</p>
       {card.loggedIn ? (
-        <button onClick={onRequest} disabled={!active} className="rounded bg-sky-700 px-4 py-2 text-white disabled:opacity-50">
+        <button onClick={onRequest} disabled={!active} className="rounded-lg bg-ink px-3.5 py-1.5 font-medium text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400">
           Request a call back
         </button>
       ) : (
-        <p className="text-sm text-sky-900">
-          <Link to="/login" className="font-medium underline">
+        <p className="text-sm text-ink-muted">
+          <Link to="/login" className="font-medium text-accent underline-offset-2 hover:underline">
             Log in
           </Link>{' '}
           and the clinic's staff can call you back.
@@ -182,18 +182,18 @@ function SlotChoicesCard({
   onPick: (offer: Offer) => void;
 }) {
   return (
-    <section aria-label="Free times" className="space-y-2 rounded-lg border bg-white p-4">
-      <p className="text-sm text-slate-600">{card.typeName}: tap a time to book it</p>
+    <section aria-label="Free times" className="space-y-3 rounded-lg border border-line bg-white p-4">
+      <p className="text-sm text-ink-muted">{card.typeName}: tap a time to book it</p>
       <div className="flex flex-wrap gap-2">
         {card.slots.map((s) => (
           <button
             key={s.start}
             onClick={() => onPick({ type: 'booking_offer', typeCode: card.typeCode, typeName: card.typeName, start: s.start, doctorId: s.doctorId, doctor: s.doctor })}
             disabled={!active}
-            className="rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-left text-brand-800 hover:border-brand-600 disabled:opacity-50"
+            className="rounded-full border border-line px-3.5 py-1.5 text-left text-ink hover:border-accent hover:text-accent disabled:opacity-50"
           >
             <TimeText iso={s.start} />
-            {s.doctor && <span className="block text-xs text-slate-500">{s.doctor}</span>}
+            {s.doctor && <span className="block text-xs text-ink-muted">{s.doctor}</span>}
           </button>
         ))}
       </div>

@@ -1,19 +1,22 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { CalendarCheck, CalendarDays, CircleAlert, FileText, LogOut, MessageSquare, UserRound } from 'lucide-react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { api } from '../api/client';
 import { useApp } from '../app-context';
 import { ZoneSelect } from './ZoneSelect';
 
 const nav = [
-  { to: '/', label: 'Chat', hint: 'Ask the assistant' },
-  { to: '/calendar', label: 'Book', hint: 'Free times by day' },
-  { to: '/my', label: 'My appointments', hint: 'Move or cancel' },
-  { to: '/results', label: 'Results', hint: "Your doctor's note" },
+  { to: '/', label: 'Chat', icon: MessageSquare },
+  { to: '/calendar', label: 'Book', icon: CalendarDays },
+  { to: '/my', label: 'My appointments', icon: CalendarCheck },
+  { to: '/results', label: 'Results', icon: FileText },
 ];
 
+const container = 'mx-auto w-full max-w-[112rem] px-4 lg:px-6';
+
 /**
- * Wide screens: a sidebar with the main sections and the clinic's details, and the page
- * beside it. Narrow screens: the sections move into the header.
+ * Wide screens: a light sidebar with the sections. Phones: a bottom tab bar. The header
+ * draws at once and never waits for the login check (a sleeping server can take a minute).
  */
 export function Layout() {
   const { clinic, me } = useApp();
@@ -34,49 +37,39 @@ export function Layout() {
   }
 
   return (
-    <div className="flex h-dvh flex-col">
-      <header className="shrink-0 border-b bg-white">
-        <div className="mx-auto flex max-w-[112rem] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <Link to="/" className="text-lg font-semibold text-brand-700">
+    <div className="flex h-dvh flex-col bg-white">
+      <header className="shrink-0 border-b border-line">
+        <div className={`${container} flex h-14 items-center gap-4`}>
+          <Link to="/" className="shrink-0 font-semibold tracking-tight whitespace-nowrap text-ink">
             {clinic?.name ?? 'Eye Clinic'}
           </Link>
-          <nav aria-label="Sections" className="flex gap-4 lg:hidden">
-            {nav.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/'}
-                className={({ isActive }) => (isActive ? 'font-medium text-brand-700' : 'text-slate-600 hover:text-brand-700')}
-              >
-                {item.label}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="ml-auto flex flex-wrap items-center gap-4">
+          <AssistantStatus />
+          <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-4">
             <ZoneSelect />
             {me ? (
-              <span className="flex items-center gap-3">
-                <span className="text-slate-600">{me.fullName ?? me.email}</span>
+              <span className="flex items-center gap-1 sm:gap-3">
+                <span className="hidden text-ink-muted md:inline">{me.fullName ?? me.email}</span>
                 <NavLink
                   to="/profile"
                   className={({ isActive }) =>
-                    `rounded border px-3 py-1 ${isActive ? 'border-brand-600 text-brand-700' : 'border-slate-300 text-slate-700 hover:border-brand-600 hover:text-brand-700'}`
+                    `inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 ${isActive ? 'bg-slate-100 text-ink' : 'text-ink-muted hover:bg-slate-100 hover:text-ink'}`
                   }
                 >
-                  Your details
+                  <UserRound aria-hidden className="size-4" />
+                  <span className="max-sm:sr-only">Your details</span>
                 </NavLink>
-                <button onClick={logout} className="text-slate-500 hover:text-brand-700">
-                  Log out
+                <button onClick={logout} className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-ink-muted hover:bg-slate-100 hover:text-ink">
+                  <LogOut aria-hidden className="size-4" />
+                  <span className="max-sm:sr-only">Log out</span>
                 </button>
               </span>
             ) : (
-              // Shown at once, also while it isn't known yet who is logged in: the header never
-              // waits for the login check (a sleeping server can take a minute to answer).
-              <span className="flex items-center gap-3">
-                <Link to="/login" className="rounded bg-brand-600 px-4 py-1.5 text-white">
+              // Shown at once, also while it isn't known yet who is logged in.
+              <span className="flex items-center gap-2">
+                <Link to="/login" className="rounded-lg bg-ink px-3.5 py-1.5 font-medium whitespace-nowrap text-white hover:bg-slate-800">
                   Log in
                 </Link>
-                <Link to="/login?mode=signup" className="text-brand-700 hover:underline">
+                <Link to="/login?mode=signup" className="rounded-lg px-2 py-1.5 whitespace-nowrap text-ink hover:bg-slate-100">
                   Sign up
                 </Link>
               </span>
@@ -86,60 +79,64 @@ export function Layout() {
       </header>
       <ConnectionNotice />
       <ProfileBanner />
-      <div className="mx-auto flex min-h-0 w-full max-w-[112rem] flex-1 gap-6 px-4 py-4 lg:px-6">
-        <aside className="hidden w-64 shrink-0 overflow-y-auto lg:block">
-          <div className="space-y-6">
-            <nav aria-label="Sections (sidebar)" className="space-y-1">
-              {nav.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === '/'}
-                  className={({ isActive }) =>
-                    `block rounded-lg px-4 py-3 ${isActive ? 'bg-brand-600 text-white' : 'text-slate-700 hover:bg-brand-50 hover:text-brand-800'}`
-                  }
-                >
-                  {({ isActive }) => (
-                    <>
-                      <span className="block font-medium">{item.label}</span>
-                      <span className={`block text-sm ${isActive ? 'text-brand-50' : 'text-slate-500'}`}>{item.hint}</span>
-                    </>
-                  )}
-                </NavLink>
-              ))}
-            </nav>
-            <ClinicCard />
-          </div>
+      <div className={`${container} flex min-h-0 flex-1 gap-8`}>
+        <aside className="hidden w-56 shrink-0 overflow-y-auto py-6 lg:block">
+          <nav aria-label="Sections (sidebar)" className="space-y-0.5">
+            {nav.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/'}
+                className={({ isActive }) =>
+                  `flex items-center gap-3 rounded-lg border-l-2 px-3 py-2 ${isActive ? 'border-accent bg-slate-100 font-medium text-ink' : 'border-transparent text-ink-muted hover:bg-slate-50 hover:text-ink'}`
+                }
+              >
+                <item.icon aria-hidden className="size-4 shrink-0" />
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
         </aside>
-        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+        <main className="min-h-0 min-w-0 flex-1 overflow-y-auto py-6">
           <Outlet />
         </main>
       </div>
+      <p className="shrink-0 border-t border-line">
+        <span className={`${container} flex items-center gap-2 py-2 text-sm text-ink-muted`}>
+          <CircleAlert aria-hidden className="size-4 shrink-0 text-danger" />
+          Sudden vision loss, severe pain or an eye injury? Go to emergency care now.
+        </span>
+      </p>
+      <nav aria-label="Sections" className="shrink-0 border-t border-line bg-white lg:hidden">
+        <div className="grid grid-cols-4">
+          {nav.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to === '/'}
+              className={({ isActive }) =>
+                `flex flex-col items-center gap-0.5 py-2 text-xs ${isActive ? 'text-accent' : 'text-ink-muted hover:text-ink'}`
+              }
+            >
+              <item.icon aria-hidden className="size-5" />
+              <span className="truncate">{item.label === 'My appointments' ? 'Appointments' : item.label}</span>
+            </NavLink>
+          ))}
+        </div>
+      </nav>
     </div>
   );
 }
 
-/** The clinic's doctors and time zone: what a patient asks about before booking. */
-function ClinicCard() {
-  const { clinic } = useApp();
-  if (!clinic) return null;
-  const city = clinic.timezone.split('/').at(-1)?.replace(/_/g, ' ');
+/** A small dot: green when the clinic API answers, amber while it is waking up or unreachable. */
+function AssistantStatus() {
+  const { connection, clinic } = useApp();
+  const online = connection === 'ok' && Boolean(clinic);
   return (
-    <div className="space-y-2 rounded-lg border bg-white p-4 text-sm">
-      <h2 className="font-medium text-slate-800">{clinic.name}</h2>
-      <p className="text-slate-600">Times are shown in clinic time ({city}).</p>
-      {clinic.doctors.length > 0 && (
-        <div>
-          <p className="text-slate-500">Doctors</p>
-          <ul className="mt-1 space-y-0.5 text-slate-700">
-            {clinic.doctors.map((d) => (
-              <li key={d.id}>{d.displayName}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-      <p className="text-xs text-slate-500">Sudden vision loss, severe pain or an eye injury? Go to emergency care now.</p>
-    </div>
+    <span className="hidden items-center gap-1.5 text-sm text-ink-muted sm:inline-flex">
+      <span aria-hidden className={`size-2 rounded-full ${online ? 'bg-success' : 'bg-warning'}`} />
+      {online ? 'Assistant online' : 'Waking up'}
+    </span>
   );
 }
 
@@ -151,14 +148,17 @@ function ConnectionNotice() {
   const { connection, retryConnection } = useApp();
   if (connection === 'ok') return null;
   return (
-    <div role="status" className="shrink-0 border-b border-slate-200 bg-slate-50">
-      <div className="mx-auto flex max-w-[112rem] flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-slate-700">
+    <div role="status" className="shrink-0 border-b border-line bg-surface">
+      <div className={`${container} flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-ink-muted`}>
         {connection === 'waking' ? (
-          <span>Waking up the assistant, this can take up to a minute.</span>
+          <span className="inline-flex items-center gap-2">
+            <span aria-hidden className="size-2 animate-pulse rounded-full bg-warning" />
+            Waking up the assistant, this can take up to a minute.
+          </span>
         ) : (
           <>
             <span>Can't reach the clinic right now. We'll keep trying.</span>
-            <button onClick={retryConnection} className="rounded border border-slate-300 bg-white px-3 py-1 hover:border-slate-500">
+            <button onClick={retryConnection} className="rounded-lg border border-line bg-white px-3 py-1 text-ink hover:border-slate-400">
               Retry
             </button>
           </>
@@ -174,8 +174,8 @@ function ProfileBanner() {
   const location = useLocation();
   if (!me || me.profileComplete || location.pathname === '/profile') return null;
   return (
-    <div role="status" className="shrink-0 border-b border-amber-200 bg-amber-50">
-      <div className="mx-auto flex max-w-[112rem] flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-amber-900">
+    <div role="status" className="shrink-0 border-b border-amber-200 bg-warning-soft">
+      <div className={`${container} flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-amber-900`}>
         <span>Add your name and date of birth to book appointments or see results.</span>
         <Link to={`/profile?next=${encodeURIComponent(location.pathname)}`} className="font-medium underline underline-offset-2">
           Complete your details →
@@ -188,9 +188,9 @@ function ProfileBanner() {
 /** For pages that need a logged-in patient. */
 export function LoginNeeded({ what }: { what: string }) {
   return (
-    <div className="rounded-lg border bg-white p-6 text-center">
-      <p className="mb-3">Please log in to {what}.</p>
-      <Link to={`/login?next=${encodeURIComponent(location.pathname)}`} className="rounded bg-brand-600 px-4 py-2 text-white">
+    <div className="mx-auto max-w-md rounded-lg border border-line p-8 text-center">
+      <p className="mb-4 text-ink-muted">Please log in to {what}.</p>
+      <Link to={`/login?next=${encodeURIComponent(location.pathname)}`} className="rounded-lg bg-ink px-4 py-2 font-medium text-white hover:bg-slate-800">
         Log in
       </Link>
     </div>
