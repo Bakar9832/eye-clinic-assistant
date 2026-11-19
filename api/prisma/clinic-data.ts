@@ -25,6 +25,7 @@ export async function seedClinic(prisma: PrismaClient, timezone: string) {
   await prisma.notification.deleteMany();
   await prisma.loginCode.deleteMany();
   await prisma.loginFailure.deleteMany();
+  await prisma.guardrailEvent.deleteMany();
   await prisma.handoffRequest.deleteMany();
   await prisma.conversation.deleteMany();
   await prisma.offer.deleteMany();

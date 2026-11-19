@@ -1,6 +1,7 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { mockApi, renderApp } from '../test/render';
+import type { GuardrailEvent } from './GuardrailsPage';
 import type { ScheduleItem, StaffMe } from './staff-api';
 
 const DOCTOR: StaffMe = { id: 's-ayesha', email: 'dr.ayesha@clinic.example', displayName: 'Dr Ayesha', role: 'DOCTOR' };
@@ -48,9 +49,9 @@ describe('A1. staff login', () => {
 
 describe('A2. what each role sees', () => {
   it.each([
-    [DOCTOR, ['Schedule', 'Handoffs', 'Glasses']],
-    [RECEPTION, ['Schedule', 'Handoffs', 'Glasses', 'New booking']],
-    [ADMIN, ['Schedule', 'Handoffs', 'Glasses', 'New booking', 'Settings']],
+    [DOCTOR, ['Schedule', 'Handoffs', 'Guardrails', 'Glasses']],
+    [RECEPTION, ['Schedule', 'Handoffs', 'Guardrails', 'Glasses', 'New booking']],
+    [ADMIN, ['Schedule', 'Handoffs', 'Guardrails', 'Glasses', 'New booking', 'Settings']],
   ])('%s', async (me, links) => {
     staffApi(me);
     renderApp('/admin');
@@ -353,5 +354,40 @@ describe('A9. staff accounts', () => {
     expect(mine).toBeDisabled();
     await userEvent.click(desk);
     expect(api.calls.find((c) => c.method === 'PATCH')).toMatchObject({ path: '/staff/users/s-desk', body: { active: false } });
+  });
+});
+
+describe('A9. the guardrail log', () => {
+  const event = (over: Partial<GuardrailEvent>): GuardrailEvent => ({
+    id: 'g1',
+    kind: 'BLOCKED',
+    action: 'BOOK',
+    reasonCode: 'ALREADY_BOOKED',
+    message: 'You already have a Follow-up visit at 9:00 AM that day (EC-ABC234).',
+    createdAt: '2030-01-07T05:00:00.000Z',
+    conversationId: null,
+    patient: { fullName: 'Demo Patient', email: 'demo.patient@example.com' },
+    repeated: false,
+    ...over,
+  });
+
+  it('lists events with their kind, patient, reason and a "Repeated" mark; filters by kind', async () => {
+    const api = staffApi(RECEPTION, {
+      'GET /staff/guardrails': (call) =>
+        call.path.includes('kind=URGENCY_CLAIM')
+          ? { body: [event({ id: 'g2', kind: 'URGENCY_CLAIM', reasonCode: 'URGENCY_WORDS', message: 'Said "urgent".', repeated: true })] }
+          : { body: [event({}), event({ id: 'g3', kind: 'URGENT_SYMPTOMS', patient: null, message: 'Matched: chemical in the eye.' })] },
+    });
+    renderApp('/admin/guardrails');
+
+    const blocked = await screen.findByRole('listitem', { name: /Blocked Demo Patient/ });
+    expect(blocked).toHaveTextContent('BOOK · ALREADY_BOOKED');
+    expect(blocked).toHaveTextContent('EC-ABC234');
+    expect(screen.getByRole('listitem', { name: /Urgent symptoms Guest/ })).toHaveTextContent('Guest (not logged in)');
+
+    await userEvent.selectOptions(screen.getByLabelText(/Show/), 'URGENCY_CLAIM');
+    const claim = await screen.findByRole('listitem', { name: /Urgency claim Demo Patient/ });
+    expect(within(claim).getByText('Repeated')).toBeInTheDocument();
+    expect(api.calls.some((c) => c.path === '/staff/guardrails?kind=URGENCY_CLAIM')).toBe(true);
   });
 });

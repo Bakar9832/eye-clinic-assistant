@@ -3,7 +3,7 @@ import { IsIn, IsString, Length } from 'class-validator';
 import { DateTime } from 'luxon';
 import { clinicSettings } from '../clinic-settings.js';
 import { Clock } from '../clock.js';
-import { OutcomeCode, PrismaClient } from '../generated/prisma/client.js';
+import { GuardrailKind, OutcomeCode, PrismaClient } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
 import { OutcomesService } from '../outcomes/outcomes.service.js';
 import { CurrentStaff, Roles, StaffGuard, type StaffActor } from './staff.guard.js';
@@ -84,6 +84,40 @@ export class StaffClinicController {
       conversationId: h.conversationId,
       // Anonymous visitors have no account; staff answer them via the conversation.
       patient: h.patient ? { fullName: h.patient.fullName, email: h.patient.email } : null,
+    }));
+  }
+
+  /**
+   * The guardrail log, newest first: refused patient actions and other flags. `repeated`
+   * marks an urgency claim from a patient who made 2+ of them in the last 30 days, so
+   * staff can spot a pattern. Names and emails only; nothing clinical.
+   */
+  @Get('guardrails')
+  async guardrails(@Query('kind') kind?: string) {
+    const kinds = Object.values(GuardrailKind) as string[];
+    const events = await this.prisma.guardrailEvent.findMany({
+      where: kind && kinds.includes(kind) ? { kind: kind as GuardrailKind } : {},
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+      include: { patient: { select: { fullName: true, email: true } } },
+    });
+    const claims = await this.prisma.guardrailEvent.groupBy({
+      by: ['patientId'],
+      where: { kind: 'URGENCY_CLAIM', patientId: { not: null }, createdAt: { gt: new Date(this.clock.now().getTime() - 30 * 24 * 3600_000) } },
+      _count: true,
+    });
+    const repeatedClaimers = new Set(claims.filter((c) => c._count >= 2).map((c) => c.patientId));
+
+    return events.map((e) => ({
+      id: e.id,
+      kind: e.kind,
+      action: e.action,
+      reasonCode: e.reasonCode,
+      message: e.message,
+      createdAt: e.createdAt.toISOString(),
+      conversationId: e.conversationId,
+      patient: e.patient ? { fullName: e.patient.fullName, email: e.patient.email } : null,
+      repeated: e.kind === 'URGENCY_CLAIM' && repeatedClaimers.has(e.patientId),
     }));
   }
 

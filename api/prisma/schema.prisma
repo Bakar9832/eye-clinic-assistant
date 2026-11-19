@@ -197,6 +197,7 @@ model Patient {
   conversations Conversation[]
   handoffs     HandoffRequest[]
   notifications Notification[]
+  guardrailEvents GuardrailEvent[]
 
   @@map("patients")
 }
@@ -469,4 +470,41 @@ model ResourceAllocation {
 
   @@index([appointmentId])
   @@map("resource_allocations")
+}
+
+/// What the guardrails stopped or flagged, for staff review (the staff "Guardrails" page).
+enum GuardrailKind {
+  /// A patient's book/move/cancel was refused (already booked that day, too many changes,
+  /// staff-only type, slot taken, ...).
+  BLOCKED
+  /// The chat matched urgent eye symptoms; staff were alerted.
+  URGENT_SYMPTOMS
+  /// "Urgent"/"emergency" wording without urgent symptoms. Booked normally; logged so
+  /// staff can see a pattern.
+  URGENCY_CLAIM
+  /// A conversation went on without progress; the patient was offered a callback.
+  STALLED
+  /// The site-wide daily chat cap was reached; the assistant said it was busy.
+  CHAT_CAP
+}
+
+/// One guardrail event. Holds the refusal's reason code and plain message, never a date of
+/// birth or the patient's own words. Deleted with old chats (ClinicSetting.chatRetentionDays).
+model GuardrailEvent {
+  id             String        @id @default(uuid()) @db.Uuid
+  kind           GuardrailKind
+  /// Empty for guests (not logged in).
+  patientId      String?       @map("patient_id") @db.Uuid
+  patient        Patient?      @relation(fields: [patientId], references: [id], onDelete: SetNull)
+  /// The chat it happened in, if any. Not a foreign key: chats are deleted on their own schedule.
+  conversationId String?       @map("conversation_id") @db.Uuid
+  /// What was attempted: BOOK, RESCHEDULE, CANCEL, CHAT.
+  action         String
+  reasonCode     String        @map("reason_code")
+  message        String
+  createdAt      DateTime      @map("created_at") @db.Timestamptz(3)
+
+  @@index([createdAt])
+  @@index([patientId, kind, createdAt])
+  @@map("guardrail_events")
 }

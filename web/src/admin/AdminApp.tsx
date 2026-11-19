@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { useApp } from '../app-context';
 import { AdminLoginPage } from './AdminLoginPage';
 import { GlassesPage } from './GlassesPage';
+import { GuardrailsPage } from './GuardrailsPage';
 import { HandoffsPage } from './HandoffsPage';
 import { NewBookingPage } from './NewBookingPage';
 import { SchedulePage } from './SchedulePage';
@@ -14,6 +15,7 @@ import { useStaffMe, type StaffRole } from './staff-api';
 const SECTIONS: { to: string; label: string; roles: StaffRole[] }[] = [
   { to: '/admin', label: 'Schedule', roles: ['DOCTOR', 'RECEPTION', 'ADMIN'] },
   { to: '/admin/handoffs', label: 'Handoffs', roles: ['DOCTOR', 'RECEPTION', 'ADMIN'] },
+  { to: '/admin/guardrails', label: 'Guardrails', roles: ['DOCTOR', 'RECEPTION', 'ADMIN'] },
   { to: '/admin/glasses', label: 'Glasses', roles: ['DOCTOR', 'RECEPTION', 'ADMIN'] },
   { to: '/admin/book', label: 'New booking', roles: ['RECEPTION', 'ADMIN'] },
   { to: '/admin/settings', label: 'Settings', roles: ['ADMIN'] },
@@ -26,6 +28,7 @@ export function AdminApp() {
       <Route element={<AdminLayout />}>
         <Route index element={<SchedulePage />} />
         <Route path="handoffs" element={<HandoffsPage />} />
+        <Route path="guardrails" element={<GuardrailsPage />} />
         <Route path="glasses" element={<GlassesPage />} />
         <Route path="book" element={<RoleOnly roles={['RECEPTION', 'ADMIN']}><NewBookingPage /></RoleOnly>} />
         <Route path="settings" element={<RoleOnly roles={['ADMIN']}><SettingsPage /></RoleOnly>} />

@@ -7,6 +7,8 @@ export interface Actor {
   type: AuditActorType;
   id?: string;
   ip?: string;
+  /** The chat the action came from, if any. Only the guardrail log uses it; the audit log doesn't store it. */
+  conversationId?: string;
 }
 
 export const SYSTEM: Actor = { type: 'SYSTEM' };

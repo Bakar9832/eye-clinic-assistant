@@ -108,6 +108,16 @@ describe('login codes and sessions', () => {
     expect((await prisma.loginFailure.findMany()).map((f) => f.id)).toEqual([recent.id]);
   });
 
+  it('D3c. guardrail events go when chats do (chatRetentionDays); recent ones stay for staff', async () => {
+    const event = (createdAt: Date) =>
+      prisma.guardrailEvent.create({ data: { kind: 'BLOCKED', action: 'BOOK', reasonCode: 'ALREADY_BOOKED', message: 'x', createdAt } });
+    await event(hoursAgo(31 * 24));
+    const recent = await event(hoursAgo(24));
+
+    expect(await retention.runOnce()).toMatchObject({ guardrailEvents: 1 });
+    expect((await prisma.guardrailEvent.findMany()).map((e) => e.id)).toEqual([recent.id]);
+  });
+
   it('D4. sessions go a day after they stopped working; nobody is logged out', async () => {
     const session = (tokenHash: string, expiresAt: Date, revokedAt?: Date) =>
       prisma.session.create({ data: { tokenHash, patientId: clinic.patients.two.id, createdAt: daysAgo(10), expiresAt, revokedAt } });
@@ -156,14 +166,14 @@ describe('what is kept, and the record of each run', () => {
     const first = await retention.runOnce();
     const second = await retention.runOnce();
 
-    expect(first).toEqual({ chats: 1, handoffs: 0, loginCodes: 0, loginFailures: 0, sessions: 0 });
-    expect(second).toEqual({ chats: 0, handoffs: 0, loginCodes: 0, loginFailures: 0, sessions: 0 });
+    expect(first).toEqual({ chats: 1, handoffs: 0, loginCodes: 0, loginFailures: 0, guardrailEvents: 0, sessions: 0 });
+    expect(second).toEqual({ chats: 0, handoffs: 0, loginCodes: 0, loginFailures: 0, guardrailEvents: 0, sessions: 0 });
     const runs = await prisma.auditEvent.findMany({ where: { action: 'RETENTION_RUN' } });
     // Only this test's two runs: older rows may predate a newly counted table.
     const ours = runs.filter((r) => !before.has(r.id));
     expect(ours).toHaveLength(2);
     for (const run of ours) {
-      expect(Object.keys(run.details as object).sort()).toEqual(['chats', 'handoffs', 'loginCodes', 'loginFailures', 'sessions']);
+      expect(Object.keys(run.details as object).sort()).toEqual(['chats', 'guardrailEvents', 'handoffs', 'loginCodes', 'loginFailures', 'sessions']);
     }
     expect(JSON.stringify(runs)).not.toContain('pink');
   });

@@ -451,7 +451,7 @@ export class ClinicToolsService {
   }
 
   private actor(who: AgentIdentity): Actor {
-    return who.patientId ? { type: 'PATIENT', id: who.patientId } : { type: 'SYSTEM' };
+    return who.patientId ? { type: 'PATIENT', id: who.patientId, conversationId: who.conversationId } : { type: 'SYSTEM' };
   }
 
   private settings() {

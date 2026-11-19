@@ -7,6 +7,7 @@ import { clinicSettings } from '../clinic-settings.js';
 import { PrismaClient, type Prisma } from '../generated/prisma/client.js';
 import { isOverlapViolation, isUniqueViolation } from '../prisma/db-errors.js';
 import { SchedulingError, type Reason } from '../scheduling-error.js';
+import { recordGuardrail } from '../guardrails/guardrails.js';
 import { generateReference } from './reference.js';
 
 export interface BookingRequest {
@@ -51,6 +52,10 @@ export class BookingService {
    * limit. Staff book through bookByStaff, which skips them.
    */
   async book(patientId: string, request: BookingRequest, now = new Date(), actor: Actor = SYSTEM) {
+    return this.loggingRefusals('BOOK', patientId, actor, now, () => this.bookChecked(patientId, request, now, actor));
+  }
+
+  private async bookChecked(patientId: string, request: BookingRequest, now: Date, actor: Actor) {
     await this.requireCompleteProfile(patientId);
     await this.refuseStaffOnlyType(request.typeCode);
     await this.refuseTooManyChanges(patientId, now, actor);
@@ -118,6 +123,12 @@ export class BookingService {
     now = new Date(),
     actor: Actor = SYSTEM,
   ) {
+    return this.loggingRefusals('RESCHEDULE', patientId, actor, now, () =>
+      this.rescheduleChecked(patientId, appointmentId, request, now, actor),
+    );
+  }
+
+  private async rescheduleChecked(patientId: string, appointmentId: string, request: RescheduleRequest, now: Date, actor: Actor) {
     if (!UUID.test(appointmentId)) throw notFound();
     const appointment = await this.prisma.appointment.findFirst({
       where: { id: appointmentId, patientId },
@@ -172,6 +183,10 @@ export class BookingService {
 
   /** A patient cancels one of their own future appointments. */
   async cancel(patientId: string, appointmentId: string, now = new Date(), actor: Actor = SYSTEM) {
+    return this.loggingRefusals('CANCEL', patientId, actor, now, () => this.cancelChecked(patientId, appointmentId, now, actor));
+  }
+
+  private async cancelChecked(patientId: string, appointmentId: string, now: Date, actor: Actor) {
     if (!UUID.test(appointmentId)) throw notFound();
     await this.refuseTooManyChanges(patientId, now, actor);
 
@@ -198,6 +213,31 @@ export class BookingService {
       );
       return tx.appointment.findUniqueOrThrow({ where: { id: appointmentId } });
     });
+  }
+
+  /**
+   * Every refusal of a patient's own action goes to the guardrail log for staff (spec:
+   * log every rejected or blocked action: patient, action, reason, time). Here, the one
+   * place all patient bookings pass through, so chat, calendar and the Confirm button
+   * can't skip it. Staff and system actions aren't logged: they aren't guarded.
+   */
+  private async loggingRefusals<T>(action: string, patientId: string, actor: Actor, now: Date, run: () => Promise<T>): Promise<T> {
+    try {
+      return await run();
+    } catch (error) {
+      if (error instanceof SchedulingError && actor.type === 'PATIENT') {
+        await recordGuardrail(this.prisma, {
+          kind: 'BLOCKED',
+          patientId,
+          conversationId: actor.conversationId,
+          action,
+          reasonCode: error.code,
+          message: error.reasons.map((r) => r.message).join(' '),
+          at: now,
+        });
+      }
+      throw error;
+    }
   }
 
   /**
