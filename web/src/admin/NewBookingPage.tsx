@@ -87,7 +87,7 @@ export function NewBookingPage() {
 
   return (
     <div className="max-w-xl space-y-4">
-      <h1 className="text-xl font-semibold">New booking</h1>
+      <h1 className="text-2xl">New booking</h1>
 
       <section className="space-y-2">
         <label className="block text-sm">
@@ -105,7 +105,7 @@ export function NewBookingPage() {
               placeholder="Name or email, at least 2 letters"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="mt-1 block w-full rounded border border-slate-300 px-2 py-1"
+              className="mt-1 block w-full rounded-lg border border-line px-3 py-1.5 bg-white"
             />
           )}
         </label>
@@ -127,7 +127,7 @@ export function NewBookingPage() {
         <div className="flex flex-wrap gap-3 text-sm">
           <label>
             Type
-            <select aria-label="Appointment type" value={typeCode} onChange={(e) => (setTypeCode(e.target.value), setDoctorId(''))} className="ml-2 rounded border border-slate-300 bg-white px-2 py-1">
+            <select aria-label="Appointment type" value={typeCode} onChange={(e) => (setTypeCode(e.target.value), setDoctorId(''))} className="ml-2 rounded-lg border border-line bg-white px-3 py-1.5">
               {types.data?.map((t) => (
                 <option key={t.code} value={t.code}>
                   {t.name}
@@ -137,7 +137,7 @@ export function NewBookingPage() {
           </label>
           <label>
             Doctor
-            <select aria-label="Doctor" value={doctorId} onChange={(e) => setDoctorId(e.target.value)} className="ml-2 rounded border border-slate-300 bg-white px-2 py-1">
+            <select aria-label="Doctor" value={doctorId} onChange={(e) => setDoctorId(e.target.value)} className="ml-2 rounded-lg border border-line bg-white px-3 py-1.5">
               <option value="">Any doctor</option>
               {doctors.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -148,14 +148,14 @@ export function NewBookingPage() {
           </label>
           <label>
             Date
-            <input type="date" aria-label="Date" required value={date} onChange={(e) => setDate(e.target.value)} className="ml-2 rounded border border-slate-300 px-2 py-1" />
+            <input type="date" aria-label="Date" required value={date} onChange={(e) => setDate(e.target.value)} className="ml-2 rounded-lg border border-line px-3 py-1.5 bg-white" />
           </label>
           <label>
             Time (clinic)
-            <input type="time" aria-label="Time" required value={time} onChange={(e) => setTime(e.target.value)} className="ml-2 rounded border border-slate-300 px-2 py-1" />
+            <input type="time" aria-label="Time" required value={time} onChange={(e) => setTime(e.target.value)} className="ml-2 rounded-lg border border-line px-3 py-1.5 bg-white" />
           </label>
         </div>
-        <button disabled={!patient || busy} className="rounded bg-slate-800 px-3 py-1.5 text-white disabled:opacity-50">
+        <button disabled={!patient || busy} className="px-3 py-1.5 rounded-lg bg-ink font-medium text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400">
           Book
         </button>
       </form>
@@ -170,7 +170,7 @@ export function NewBookingPage() {
           </ul>
           <label className="block text-sm">
             Reason for booking anyway (kept in the audit log)
-            <textarea aria-label="Reason" rows={2} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1 block w-full rounded border border-slate-300 bg-white px-2 py-1" />
+            <textarea aria-label="Reason" rows={2} maxLength={300} value={reason} onChange={(e) => setReason(e.target.value)} className="mt-1 block w-full rounded-lg border border-line bg-white px-3 py-1.5" />
           </label>
           <button onClick={() => void book(true)} disabled={busy || reason.trim().length < MIN_REASON} className="rounded bg-amber-600 px-3 py-1 text-sm text-white disabled:opacity-50">
             Book anyway

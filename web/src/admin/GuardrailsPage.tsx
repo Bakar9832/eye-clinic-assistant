@@ -38,10 +38,10 @@ export function GuardrailsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Guardrails</h1>
+        <h1 className="text-2xl">Guardrails</h1>
         <label className="text-sm">
           Show{' '}
-          <select value={kind} onChange={(e) => setKind(e.target.value as Kind | '')} className="ml-1 rounded border border-slate-300 px-2 py-1">
+          <select value={kind} onChange={(e) => setKind(e.target.value as Kind | '')} className="ml-1 rounded-lg border border-line px-3 py-1.5 bg-white">
             <option value="">Everything</option>
             {(Object.keys(KINDS) as Kind[]).map((k) => (
               <option key={k} value={k}>
@@ -52,12 +52,12 @@ export function GuardrailsPage() {
         </label>
       </div>
       <p className="text-sm text-slate-600">Refused or blocked patient actions and other flags, newest first.</p>
-      {events.data?.length === 0 && <p className="text-slate-500">Nothing logged.</p>}
+      {events.data?.length === 0 && <p className="rounded-lg border border-dashed border-line p-6 text-center text-ink-muted">Nothing logged. Refused bookings and flags will appear here.</p>}
       <ul className="space-y-2">
         {events.data?.map((e) => (
-          <li key={e.id} aria-label={`${KINDS[e.kind].label} ${e.patient?.fullName ?? 'Guest'}`} className="rounded-lg border bg-white p-3">
+          <li key={e.id} aria-label={`${KINDS[e.kind].label} ${e.patient?.fullName ?? 'Guest'}`} className="rounded-lg border border-line bg-white p-4">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-              <span className={`rounded px-2 py-0.5 font-medium ${KINDS[e.kind].style}`}>{KINDS[e.kind].label}</span>
+              <span className={`rounded-md px-2 py-0.5 font-medium ${KINDS[e.kind].style}`}>{KINDS[e.kind].label}</span>
               {e.repeated && <span className="rounded bg-amber-600 px-2 py-0.5 font-medium text-white">Repeated</span>}
               <span className="text-slate-500">{clinic ? clinicTime(e.createdAt, clinic.timezone, 'ccc d LLL h:mm a') : ''}</span>
               <span className="text-slate-700">

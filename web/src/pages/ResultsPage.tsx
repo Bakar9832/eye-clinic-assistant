@@ -1,3 +1,4 @@
+import { Skeleton } from '../components/Skeleton';
 import { useQuery } from '@tanstack/react-query';
 import { DateTime } from 'luxon';
 import { api, ApiError, errorText } from '../api/client';
@@ -24,7 +25,7 @@ export function ResultsPage() {
   } else if (result.error) {
     body = <p role="alert" className="text-red-700">{errorText(result.error)}</p>;
   } else if (!result.data) {
-    body = <p className="text-slate-500">Loading…</p>;
+    body = <Skeleton lines={3} label="Loading your results…" />;
   } else if (result.data.status === 'NOT_READY') {
     body = <p>Your results aren't in yet. We'll let you know when the doctor has recorded them.</p>;
   } else {
@@ -45,7 +46,7 @@ export function ResultsPage() {
 
   return (
     <div className="max-w-xl space-y-4">
-      <h1 className="text-xl font-semibold">Results</h1>
+      <h1 className="text-2xl">Results</h1>
       {body}
     </div>
   );

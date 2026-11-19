@@ -25,11 +25,11 @@ export function ProfileForm({ onSaved }: { onSaved?: () => void }) {
   }
 
   return (
-    <form onSubmit={submit} aria-label="Your details" className="space-y-3 rounded-lg border bg-white p-4">
+    <form onSubmit={submit} aria-label="Your details" className="space-y-4 rounded-lg border border-line bg-white p-5">
       <p className="text-sm text-slate-600">Before your first booking we need your name and date of birth.</p>
       <label className="block">
         <span className="text-sm">Full name</span>
-        <input required value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1 w-full rounded border border-slate-300 px-2 py-1" />
+        <input required value={fullName} onChange={(e) => setFullName(e.target.value)} className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 bg-white" />
       </label>
       {!me?.hasDateOfBirth && (
         <label className="block">
@@ -39,11 +39,11 @@ export function ProfileForm({ onSaved }: { onSaved?: () => void }) {
             required
             value={dateOfBirth}
             onChange={(e) => setDateOfBirth(e.target.value)}
-            className="mt-1 w-full rounded border border-slate-300 px-2 py-1"
+            className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 bg-white"
           />
         </label>
       )}
-      <button className="rounded bg-brand-600 px-3 py-1.5 text-white">Save</button>
+      <button className="px-3 py-1.5 rounded-lg bg-ink font-medium text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400">Save</button>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
     </form>
   );

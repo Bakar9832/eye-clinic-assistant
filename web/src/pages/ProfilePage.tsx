@@ -14,8 +14,8 @@ export function ProfilePage() {
   if (!me) return null;
 
   return (
-    <div className="max-w-md space-y-5">
-      <h1 className="text-xl font-semibold">Your details</h1>
+    <div className="max-w-lg space-y-5">
+      <h1 className="text-2xl">Your details</h1>
       <p className="text-sm text-slate-600">Email: {me.email}</p>
       <ProfileForm onSaved={next ? () => navigate(next) : undefined} />
       {me.hasDateOfBirth && (

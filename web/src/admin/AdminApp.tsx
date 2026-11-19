@@ -43,7 +43,7 @@ function AdminLayout() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  if (staff === undefined) return <p className="p-6 text-slate-500">Loading…</p>;
+  if (staff === undefined) return <p className="p-6 text-ink-muted">Loading…</p>;
   if (staff === null) return <Navigate to="/admin/login" replace />;
 
   async function logout() {
@@ -57,28 +57,36 @@ function AdminLayout() {
   }
 
   return (
-    <div className="min-h-screen">
-      <header className="border-b bg-slate-800 text-slate-100">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <span className="font-semibold">{clinic?.name ?? 'Clinic'} · Staff</span>
-          <nav className="flex gap-4 text-sm">
-            {SECTIONS.filter((s) => s.roles.includes(staff.role)).map((s) => (
-              <NavLink key={s.to} to={s.to} end className={({ isActive }) => (isActive ? 'font-medium text-white' : 'text-slate-300 hover:text-white')}>
-                {s.label}
-              </NavLink>
-            ))}
-          </nav>
+    <div className="min-h-screen bg-white">
+      <header className="border-b border-line">
+        <div className="mx-auto flex h-14 max-w-5xl items-center gap-3 px-4">
+          <span className="font-semibold tracking-tight whitespace-nowrap text-ink">{clinic?.name ?? 'Clinic'}</span>
+          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-ink-muted">Staff</span>
           <span className="ml-auto flex items-center gap-3 text-sm">
-            <span>
-              {staff.displayName} <span className="text-slate-400">({staff.role.toLowerCase()})</span>
+            <span className="hidden text-ink sm:inline">
+              {staff.displayName} <span className="text-ink-muted">· {staff.role.toLowerCase()}</span>
             </span>
-            <button onClick={logout} className="text-slate-300 hover:text-white">
+            <button onClick={logout} className="rounded-lg px-2.5 py-1.5 text-ink-muted hover:bg-slate-100 hover:text-ink">
               Log out
             </button>
           </span>
         </div>
+        <nav className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-3 pb-2">
+          {SECTIONS.filter((s) => s.roles.includes(staff.role)).map((s) => (
+            <NavLink
+              key={s.to}
+              to={s.to}
+              end
+              className={({ isActive }) =>
+                `rounded-lg px-3 py-1.5 text-sm whitespace-nowrap ${isActive ? 'bg-slate-100 font-medium text-ink' : 'text-ink-muted hover:bg-slate-50 hover:text-ink'}`
+              }
+            >
+              {s.label}
+            </NavLink>
+          ))}
+        </nav>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-6">
+      <main className="mx-auto max-w-5xl px-4 py-8">
         <Outlet />
       </main>
     </div>

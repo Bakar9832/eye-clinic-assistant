@@ -26,12 +26,14 @@ export function AdminLoginPage() {
   }
 
   return (
-    <div className="mx-auto mt-16 max-w-sm space-y-4 px-4">
-      <h1 className="text-xl font-semibold">Staff login</h1>
+    <div className="min-h-screen bg-surface px-4 pt-16">
+    <div className="mx-auto max-w-sm space-y-4 rounded-lg border border-line bg-white p-6 sm:p-8">
+      <h1 className="text-2xl">Staff login</h1>
+      <p className="text-sm text-ink-muted">For clinic staff. Patients log in on the main site.</p>
       <form onSubmit={submit} className="space-y-3">
         <label className="block">
           <span className="text-sm">Work email</span>
-          <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5" />
+          <input type="email" autoComplete="username" required value={email} onChange={(e) => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 bg-white" />
         </label>
         <label className="block">
           <span className="text-sm">Password</span>
@@ -41,12 +43,13 @@ export function AdminLoginPage() {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded border border-slate-300 px-2 py-1.5"
+            className="mt-1 w-full rounded-lg border border-line px-3 py-1.5 bg-white"
           />
         </label>
-        <button className="w-full rounded bg-slate-800 py-2 text-white">Log in</button>
+        <button className="w-full py-2 rounded-lg bg-ink font-medium text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400">Log in</button>
       </form>
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+    </div>
     </div>
   );
 }

@@ -17,7 +17,7 @@ interface Affected {
 export function SettingsPage() {
   return (
     <div className="space-y-8">
-      <h1 className="text-xl font-semibold">Settings</h1>
+      <h1 className="text-2xl">Settings</h1>
       <ClinicSettings />
       <AppointmentTypes />
       <WorkingHours />
@@ -87,11 +87,11 @@ function ClinicSettings() {
       <h2 className="font-medium">Clinic</h2>
       <form onSubmit={submit} className="grid max-w-lg gap-2 text-sm">
         <label>
-          Name <input aria-label="Clinic name" value={value('name')} onChange={(e) => set('name', e.target.value)} className="ml-2 rounded border border-slate-300 px-2 py-1" />
+          Name <input aria-label="Clinic name" value={value('name')} onChange={(e) => set('name', e.target.value)} className="ml-2 rounded-lg border border-line px-3 py-1.5 bg-white" />
         </label>
         <label>
           Clinic time zone
-          <select aria-label="Clinic time zone" value={value('timezone')} onChange={(e) => set('timezone', e.target.value)} className="ml-2 max-w-60 rounded border border-slate-300 bg-white px-2 py-1">
+          <select aria-label="Clinic time zone" value={value('timezone')} onChange={(e) => set('timezone', e.target.value)} className="ml-2 max-w-60 rounded-lg border border-line bg-white px-3 py-1.5">
             {[...new Set([value('timezone'), ...ZONES])].map((z) => (
               <option key={z} value={z}>
                 {z}
@@ -101,7 +101,7 @@ function ClinicSettings() {
         </label>
         <label>
           Slot grid
-          <select aria-label="Slot grid" value={value('slotGridMin')} onChange={(e) => set('slotGridMin', Number(e.target.value))} className="ml-2 rounded border border-slate-300 bg-white px-2 py-1">
+          <select aria-label="Slot grid" value={value('slotGridMin')} onChange={(e) => set('slotGridMin', Number(e.target.value))} className="ml-2 rounded-lg border border-line bg-white px-3 py-1.5">
             {[5, 10, 15, 20, 30, 60].map((m) => (
               <option key={m} value={m}>
                 every {m} min
@@ -121,7 +121,7 @@ function ClinicSettings() {
             max={720}
             value={value('outcomeEditWindowHours')}
             onChange={(e) => set('outcomeEditWindowHours', Number(e.target.value))}
-            className="ml-2 w-20 rounded border border-slate-300 px-2 py-1"
+            className="ml-2 w-20 rounded-lg border border-line px-3 py-1.5 bg-white"
           />
         </label>
         <h3 className="mt-2 font-medium">Guardrails</h3>
@@ -135,11 +135,11 @@ function ClinicSettings() {
               max={max}
               value={value(key)}
               onChange={(e) => set(key, Number(e.target.value))}
-              className="ml-2 w-24 rounded border border-slate-300 px-2 py-1"
+              className="ml-2 w-24 rounded-lg border border-line px-3 py-1.5 bg-white"
             />
           </label>
         ))}
-        <button disabled={Object.keys(changes).length === 0 || save.isPending} className="w-fit rounded bg-slate-800 px-3 py-1 text-white disabled:opacity-50">
+        <button disabled={Object.keys(changes).length === 0 || save.isPending} className="w-fit px-3 py-1 rounded-lg bg-ink font-medium text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400">
           Save clinic settings
         </button>
       </form>
@@ -195,7 +195,7 @@ function TypeRow({ type, onSaved }: { type: AppointmentTypeWithSteps; onSaved: (
       <span className="w-48 font-medium">{type.name}</span>
       <label>
         told {' '}
-        <input type="number" aria-label={`${type.name} patient time`} min={1} max={180} value={typicalMin} onChange={(e) => setTypicalMin(Number(e.target.value))} className="w-16 rounded border border-slate-300 px-1" /> min
+        <input type="number" aria-label={`${type.name} patient time`} min={1} max={180} value={typicalMin} onChange={(e) => setTypicalMin(Number(e.target.value))} className="w-16 rounded-lg border border-line px-1 bg-white" /> min
       </label>
       {type.steps.map((s) => (
         <label key={s.position}>
@@ -207,11 +207,11 @@ function TypeRow({ type, onSaved }: { type: AppointmentTypeWithSteps; onSaved: (
             max={180}
             value={durations[s.position]}
             onChange={(e) => setDurations((d) => ({ ...d, [s.position]: Number(e.target.value) }))}
-            className="w-14 rounded border border-slate-300 px-1"
+            className="w-14 rounded-lg border border-line px-1 bg-white"
           />
         </label>
       ))}
-      <button className="rounded border border-slate-300 px-2">Save</button>
+      <button className="rounded-lg border border-line px-3 bg-white">Save</button>
       {save.error && <span role="alert" className="text-red-700">{errorText(save.error)}</span>}
     </form>
   );
@@ -246,7 +246,7 @@ function WorkingHours() {
   return (
     <section aria-label="Working hours" className="space-y-2">
       <h2 className="font-medium">Working hours</h2>
-      <select aria-label="Whose hours" value={resourceId} onChange={(e) => (setResourceId(e.target.value), setWindows(null), save.reset())} className="rounded border border-slate-300 bg-white px-2 py-1 text-sm">
+      <select aria-label="Whose hours" value={resourceId} onChange={(e) => (setResourceId(e.target.value), setWindows(null), save.reset())} className="rounded-lg border border-line bg-white px-3 py-1.5 text-sm">
         <option value="">Choose a person or machine…</option>
         {resources.data?.map((r) => (
           <option key={r.id} value={r.id}>
@@ -258,16 +258,16 @@ function WorkingHours() {
         <div className="space-y-1 text-sm">
           {shown.map((w, i) => (
             <div key={i} className="flex items-center gap-2">
-              <select aria-label={`Window ${i + 1} day`} value={w.weekday} onChange={(e) => edit(i, { weekday: Number(e.target.value) })} className="rounded border border-slate-300 bg-white px-1">
+              <select aria-label={`Window ${i + 1} day`} value={w.weekday} onChange={(e) => edit(i, { weekday: Number(e.target.value) })} className="rounded-lg border border-line bg-white px-1">
                 {WEEKDAYS.map((d, n) => (
                   <option key={d} value={n + 1}>
                     {d}
                   </option>
                 ))}
               </select>
-              <input type="time" aria-label={`Window ${i + 1} start`} value={w.start} onChange={(e) => edit(i, { start: e.target.value })} className="rounded border border-slate-300 px-1" />
+              <input type="time" aria-label={`Window ${i + 1} start`} value={w.start} onChange={(e) => edit(i, { start: e.target.value })} className="rounded-lg border border-line px-1 bg-white" />
               –
-              <input type="time" aria-label={`Window ${i + 1} end`} value={w.end} onChange={(e) => edit(i, { end: e.target.value })} className="rounded border border-slate-300 px-1" />
+              <input type="time" aria-label={`Window ${i + 1} end`} value={w.end} onChange={(e) => edit(i, { end: e.target.value })} className="rounded-lg border border-line px-1 bg-white" />
               <button type="button" onClick={() => setWindows(shown.filter((_, j) => j !== i))} className="text-slate-500">
                 remove
               </button>
@@ -277,7 +277,7 @@ function WorkingHours() {
             <button type="button" onClick={() => setWindows([...shown, { weekday: 1, start: '09:00', end: '17:00' }])} className="text-slate-600 underline">
               Add a window
             </button>
-            <button onClick={() => save.mutate()} disabled={save.isPending} className="rounded bg-slate-800 px-3 py-1 text-white">
+            <button onClick={() => save.mutate()} disabled={save.isPending} className="px-3 py-1 rounded-lg bg-ink font-medium text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400">
               Save hours
             </button>
           </div>
@@ -320,7 +320,7 @@ function Leave() {
     <section aria-label="Leave" className="space-y-2">
       <h2 className="font-medium">Leave</h2>
       <form onSubmit={submit} className="flex flex-wrap items-center gap-2 text-sm">
-        <select aria-label="Who is away" required value={resourceId} onChange={(e) => setResourceId(e.target.value)} className="rounded border border-slate-300 bg-white px-2 py-1">
+        <select aria-label="Who is away" required value={resourceId} onChange={(e) => setResourceId(e.target.value)} className="rounded-lg border border-line bg-white px-3 py-1.5">
           <option value="">Who…</option>
           {resources.data?.map((r) => (
             <option key={r.id} value={r.id}>
@@ -328,11 +328,11 @@ function Leave() {
             </option>
           ))}
         </select>
-        <input type="date" aria-label="First day" required value={from} onChange={(e) => setFrom(e.target.value)} className="rounded border border-slate-300 px-1" />
+        <input type="date" aria-label="First day" required value={from} onChange={(e) => setFrom(e.target.value)} className="rounded-lg border border-line px-1 bg-white" />
         to
-        <input type="date" aria-label="Last day" required value={to} min={from} onChange={(e) => setTo(e.target.value)} className="rounded border border-slate-300 px-1" />
-        <input aria-label="Reason" placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} className="rounded border border-slate-300 px-2 py-1" />
-        <button className="rounded bg-slate-800 px-3 py-1 text-white">Add leave</button>
+        <input type="date" aria-label="Last day" required value={to} min={from} onChange={(e) => setTo(e.target.value)} className="rounded-lg border border-line px-1 bg-white" />
+        <input aria-label="Reason" placeholder="Reason (optional)" value={reason} onChange={(e) => setReason(e.target.value)} className="rounded-lg border border-line px-3 py-1.5 bg-white" />
+        <button className="px-3 py-1 rounded-lg bg-ink font-medium text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400">Add leave</button>
       </form>
       {message && <p role="status" className="text-sm">{message}</p>}
       <AffectedList bookings={inTheWay} title="Not saved: these appointments need them. Move the patients first:" />
@@ -364,7 +364,7 @@ function StaffAccounts() {
               onClick={() => toggle.mutate({ id: u.id, active: !u.active })}
               disabled={u.id === me?.id}
               title={u.id === me?.id ? "You can't switch off your own account" : undefined}
-              className="rounded border border-slate-300 px-2 disabled:opacity-40"
+              className="rounded-lg border border-line px-3 disabled:opacity-40 bg-white"
             >
               {u.active ? 'Switch off' : 'Switch on'}
             </button>

@@ -37,9 +37,12 @@ describe('my appointments', () => {
     expect(api.calls.some((c) => c.method === 'DELETE')).toBe(false);
 
     await userEvent.click(screen.getByRole('button', { name: 'Yes, cancel it' }));
-    // The refreshed list shows it under past and cancelled.
-    expect(await screen.findByText(/cancelled · EC-ABC234/)).toBeInTheDocument();
-    expect(screen.getByText('Nothing booked.')).toBeInTheDocument();
+    // The refreshed list shows it under past and cancelled (status badge + reference).
+    const past = (await screen.findByText('EC-ABC234')).closest('li')!;
+    expect(past).toHaveTextContent('cancelled');
+    // Copy changed on purpose: the empty state now offers a way to book.
+    expect(screen.getByText('Nothing booked yet.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Book an appointment' })).toHaveAttribute('href', '/calendar');
     expect(api.calls.filter((c) => c.method === 'DELETE').map((c) => c.path)).toEqual(['/me/appointments/appt-1']);
   });
 

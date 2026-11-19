@@ -24,34 +24,34 @@ export function SchedulePage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold">Schedule</h1>
-        <input type="date" aria-label="Day" value={day} onChange={(e) => e.target.value && setDay(e.target.value)} className="rounded border border-slate-300 px-2 py-1" />
+        <h1 className="text-2xl">Schedule</h1>
+        <input type="date" aria-label="Day" value={day} onChange={(e) => e.target.value && setDay(e.target.value)} className="rounded-lg border border-line px-3 py-1.5 bg-white" />
         <span className="text-sm text-slate-500">Times in clinic time ({clinic.timezone})</span>
       </div>
 
-      {schedule.data?.appointments.length === 0 && <p className="text-slate-500">No appointments on this day.</p>}
-      <ul className="divide-y rounded-lg border bg-white">
+      {schedule.data?.appointments.length === 0 && <p className="rounded-lg border border-dashed border-line p-6 text-center text-ink-muted">No appointments on this day.</p>}
+      <ul className="divide-y divide-line rounded-lg border border-line bg-white">
         {schedule.data?.appointments.map((a) => {
           const canRecord = staff?.role === 'DOCTOR' && a.examinedByMe && a.status === 'BOOKED' && Date.parse(a.start) <= now;
           const canCorrect = staff?.role === 'DOCTOR' && a.examinedByMe && a.hasOutcome;
           return (
-            <li key={a.id} className="space-y-2 p-3" aria-label={`${clinicTime(a.start, clinic.timezone)} ${a.patient.fullName ?? ''}`}>
+            <li key={a.id} className="space-y-2 px-4 py-3" aria-label={`${clinicTime(a.start, clinic.timezone)} ${a.patient.fullName ?? ''}`}>
               <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                <span className="font-mono">{clinicTime(a.start, clinic.timezone)}</span>
+                <span className="w-20 font-medium tabular-nums">{clinicTime(a.start, clinic.timezone)}</span>
                 <span className="font-medium">{a.patient.fullName ?? '(no name yet)'}</span>
                 <span className="text-sm text-slate-600">{a.type.name}</span>
                 {a.doctor && <span className="text-sm text-slate-600">{a.doctor}</span>}
-                <span className={`rounded px-1.5 text-xs ${a.status === 'CANCELLED' ? 'bg-slate-100 text-slate-500' : a.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' : 'bg-sky-50 text-sky-700'}`}>
+                <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${a.status === 'CANCELLED' ? 'bg-slate-100 text-ink-muted' : a.status === 'COMPLETED' ? 'bg-slate-100 text-ink' : 'bg-accent-soft text-accent'}`}>
                   {a.status.toLowerCase()}
                 </span>
-                <span className="font-mono text-xs text-slate-400">{a.reference}</span>
+                <span className="font-mono text-xs text-ink-muted">{a.reference}</span>
                 {a.attentionReason && (
-                  <span title={a.attentionReason} className="rounded bg-red-100 px-1.5 text-xs font-medium text-red-800">
+                  <span title={a.attentionReason} className="rounded-md border border-red-200 bg-danger-soft px-2 py-0.5 text-xs font-medium text-danger">
                     Attention needed
                   </span>
                 )}
               </div>
-              {a.attentionReason && <p className="text-sm text-red-800">{a.attentionReason}</p>}
+              {a.attentionReason && <p className="text-sm text-danger">{a.attentionReason}</p>}
               {canRecord && <OutcomeEditor appointmentId={a.id} day={day} />}
               {canCorrect && <OutcomeEditor appointmentId={a.id} day={day} existing />}
             </li>
@@ -89,7 +89,7 @@ function OutcomeEditor({ appointmentId, day, existing = false }: { appointmentId
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="rounded border border-slate-300 px-2 py-1 text-sm">
+      <button onClick={() => setOpen(true)} className="rounded-lg border border-line px-3 py-1.5 text-sm bg-white">
         {existing ? 'Correct outcome' : 'Record outcome'}
       </button>
     );
@@ -111,10 +111,10 @@ function OutcomeEditor({ appointmentId, day, existing = false }: { appointmentId
   }
 
   return (
-    <form onSubmit={submit} aria-label={existing ? 'Correct outcome' : 'Record outcome'} className="space-y-2 rounded bg-slate-50 p-3">
+    <form onSubmit={submit} aria-label={existing ? 'Correct outcome' : 'Record outcome'} className="space-y-3 rounded-lg border border-line bg-surface p-4">
       <label className="block text-sm">
         Outcome
-        <select aria-label="Outcome" required value={shownCode} onChange={(e) => setCode(e.target.value as OutcomeCode)} className="ml-2 rounded border border-slate-300 bg-white px-2 py-1">
+        <select aria-label="Outcome" required value={shownCode} onChange={(e) => setCode(e.target.value as OutcomeCode)} className="ml-2 rounded-lg border border-line bg-white px-3 py-1.5">
           <option value="" disabled>
             Choose…
           </option>
@@ -134,14 +134,14 @@ function OutcomeEditor({ appointmentId, day, existing = false }: { appointmentId
           rows={3}
           value={shownNote}
           onChange={(e) => setNote(e.target.value)}
-          className="mt-1 block w-full rounded border border-slate-300 bg-white px-2 py-1"
+          className="mt-1 block w-full rounded-lg border border-line bg-white px-3 py-1.5"
         />
         <span className="text-xs text-slate-500">
           {shownNote.length}/{NOTE_LIMIT}
         </span>
       </label>
       <div className="flex gap-2">
-        <button disabled={save.isPending || !shownCode || !shownNote} className="rounded bg-slate-800 px-3 py-1 text-sm text-white disabled:opacity-50">
+        <button disabled={save.isPending || !shownCode || !shownNote} className="px-3 py-1 text-sm rounded-lg bg-ink font-medium text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400">
           {existing ? 'Save correction' : 'Save outcome'}
         </button>
         <button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500">

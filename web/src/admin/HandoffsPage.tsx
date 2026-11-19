@@ -32,19 +32,19 @@ export function HandoffsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Handoffs</h1>
-      {handoffs.data?.length === 0 && <p className="text-slate-500">Nothing waiting.</p>}
+      <h1 className="text-2xl">Handoffs</h1>
+      {handoffs.data?.length === 0 && <p className="rounded-lg border border-dashed border-line p-6 text-center text-ink-muted">Nothing waiting. New questions and call-back requests appear here.</p>}
       <ul className="space-y-2">
         {handoffs.data?.map((h) => (
           <li key={h.id} aria-label={`${KIND[h.kind].label} ${h.patient?.fullName ?? 'Guest'}`} className={`rounded-lg border bg-white p-3 ${h.kind === 'URGENT' ? 'border-red-300' : ''}`}>
             <div className="flex flex-wrap items-baseline gap-x-3 text-sm text-slate-500">
-              <span className={`rounded px-2 py-0.5 text-xs font-medium ${KIND[h.kind].style}`}>{KIND[h.kind].label}</span>
+              <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${KIND[h.kind].style}`}>{KIND[h.kind].label}</span>
               <span>{clinic ? clinicTime(h.createdAt, clinic.timezone, 'ccc d LLL h:mm a') : ''}</span>
               <span>{h.patient ? `${h.patient.fullName ?? '(no name)'} · ${h.patient.email}` : 'Guest (not logged in)'}</span>
             </div>
             <p className="my-1">{h.reason}</p>
             {h.preferredTime && <p className="mb-1 text-sm text-slate-600">Best time to call: {h.preferredTime}</p>}
-            <button onClick={() => close.mutate(h.id)} disabled={close.isPending} className="rounded border border-slate-300 px-2 py-0.5 text-sm">
+            <button onClick={() => close.mutate(h.id)} disabled={close.isPending} className="rounded-lg border border-line px-3 py-1.5 text-sm bg-white">
               Mark as handled
             </button>
           </li>

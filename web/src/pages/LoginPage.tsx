@@ -9,9 +9,9 @@ const TITLES: Record<Mode, string> = { login: 'Log in', signup: 'Create account'
 /** Must match the API's PASSWORD_MIN; the API checks it again. */
 const PASSWORD_MIN = 8;
 
-const inputClass = 'mt-1 w-full rounded border border-slate-300 px-2 py-1.5';
-const primaryClass = 'w-full rounded bg-brand-600 py-2 text-white disabled:opacity-50';
-const linkClass = 'text-sm text-brand-700 underline-offset-2 hover:underline';
+const inputClass = 'mt-1 w-full rounded-lg border border-line bg-white px-3 py-2';
+const primaryClass = 'w-full rounded-lg bg-ink py-2.5 font-medium text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400';
+const linkClass = 'text-sm text-accent underline-offset-2 hover:underline';
 
 /**
  * Log in with email + password. Creating an account and resetting a password share one
@@ -103,8 +103,8 @@ export function LoginPage() {
   );
 
   return (
-    <div className="mx-auto max-w-sm space-y-6">
-      <h1 className="text-xl font-semibold">{TITLES[mode]}</h1>
+    <div className="mx-auto mt-4 max-w-sm space-y-6 rounded-lg border border-line p-6 sm:mt-10 sm:p-8">
+      <h1 className="text-2xl">{TITLES[mode]}</h1>
 
       {mode === 'login' && (
         <form onSubmit={logIn} className="space-y-3">

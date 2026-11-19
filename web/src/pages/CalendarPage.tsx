@@ -7,6 +7,7 @@ import { useApp } from '../app-context';
 import { TicketCard } from '../components/cards';
 import { LoginNeeded } from '../components/Layout';
 import { ProfileForm } from '../components/ProfileForm';
+import { Skeleton } from '../components/Skeleton';
 import { TimeText } from '../components/TimeText';
 import { daysFrom, todayIn } from '../time/zones';
 
@@ -54,7 +55,7 @@ export function CalendarPage() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-xl font-semibold">Book an appointment</h1>
+      <h1 className="text-2xl">Book an appointment</h1>
 
       <div className="flex flex-wrap gap-3">
         <label className="text-sm">
@@ -67,7 +68,7 @@ export function CalendarPage() {
               setDoctorId('');
               setChosen(null);
             }}
-            className="ml-2 rounded border border-slate-300 bg-white px-2 py-1"
+            className="ml-2 rounded-lg border border-line bg-white px-3 py-1.5"
           >
             {types.data?.map((t) => (
               <option key={t.code} value={t.code}>
@@ -85,7 +86,7 @@ export function CalendarPage() {
               setDoctorId(e.target.value);
               setChosen(null);
             }}
-            className="ml-2 rounded border border-slate-300 bg-white px-2 py-1"
+            className="ml-2 rounded-lg border border-line bg-white px-3 py-1.5"
           >
             <option value="">Any doctor</option>
             {doctors.map((d) => (
@@ -110,7 +111,7 @@ export function CalendarPage() {
       {booked && <TicketCard card={{ type: 'ticket', reference: booked.reference, start: booked.start, doctor: booked.doctor?.displayName ?? null, prepInstructions: booked.prepInstructions }} />}
 
       {chosen && (
-        <div className="rounded-lg border-2 border-brand-600 bg-white p-4">
+        <div className="rounded-lg border border-accent bg-white p-4">
           {me === null ? (
             <LoginNeeded what="book" />
           ) : me && !me.profileComplete ? (
@@ -121,7 +122,7 @@ export function CalendarPage() {
                 {type?.name}: <TimeText iso={chosen.start} />
                 {chosen.doctor && ` with ${chosen.doctor.displayName}`}
               </span>
-              <button onClick={() => book.mutate(chosen)} disabled={book.isPending} className="rounded bg-brand-600 px-3 py-1.5 text-white">
+              <button onClick={() => book.mutate(chosen)} disabled={book.isPending} className="px-3 py-1.5 rounded-lg bg-ink font-medium text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-400">
                 Book this
               </button>
               <button onClick={() => setChosen(null)} className="text-sm text-slate-500">
@@ -138,12 +139,12 @@ export function CalendarPage() {
           const result = availability[i];
           const slots = result?.data?.slots ?? [];
           return (
-            <section key={day} aria-label={DateTime.fromISO(day).toFormat('cccc d LLLL')} className="rounded-lg border bg-white p-3">
-              <h2 className="mb-2 text-sm font-medium">{DateTime.fromISO(day).toFormat('ccc d LLL')}</h2>
+            <section key={day} aria-label={DateTime.fromISO(day).toFormat('cccc d LLLL')} className="rounded-lg border border-line bg-white p-4">
+              <h2 className="mb-3 text-sm font-medium tabular-nums">{DateTime.fromISO(day).toFormat('ccc d LLL')}</h2>
               {result?.isPending ? (
-                <p className="text-xs text-slate-400">Loading…</p>
+                <Skeleton lines={2} label="Loading free times…" />
               ) : slots.length === 0 ? (
-                <p className="text-xs text-slate-400">No free times</p>
+                <p className="text-sm text-ink-muted">No free times</p>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
                   {slots.map((slot) => (
@@ -154,7 +155,7 @@ export function CalendarPage() {
                         setBooked(null);
                       }}
                       title={slot.doctor?.displayName}
-                      className={`rounded border px-2 py-1 text-sm ${chosen?.start === slot.start ? 'border-brand-600 bg-brand-50' : 'border-slate-200 hover:border-brand-600'}`}
+                      className={`rounded-full border px-3 py-1 text-sm ${chosen?.start === slot.start ? 'border-accent bg-accent-soft text-accent' : 'border-line text-ink hover:border-accent hover:text-accent'}`}
                     >
                       <TimeText iso={slot.start} compact />
                     </button>

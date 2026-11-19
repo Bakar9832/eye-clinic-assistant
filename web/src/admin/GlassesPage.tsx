@@ -31,7 +31,7 @@ export function GlassesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Glasses</h1>
+      <h1 className="text-2xl">Glasses</h1>
       <p className="text-sm text-slate-500">New prescriptions waiting for their glasses, longest-waiting first.</p>
       {waiting.data?.length === 0 && <p className="text-slate-500">No glasses waiting.</p>}
       <ul className="space-y-2">
@@ -44,7 +44,7 @@ export function GlassesPage() {
             <button
               onClick={() => markReady(g)}
               disabled={ready.isPending}
-              className="ml-auto rounded border border-slate-300 px-2 py-0.5 text-sm"
+              className="ml-auto rounded-lg border border-line px-3 py-1.5 text-sm bg-white"
             >
               Glasses ready
             </button>
