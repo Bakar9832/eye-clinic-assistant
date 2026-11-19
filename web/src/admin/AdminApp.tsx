@@ -44,7 +44,11 @@ function AdminLayout() {
   if (staff === null) return <Navigate to="/admin/login" replace />;
 
   async function logout() {
-    await api('/staff/auth/logout', { method: 'POST' });
+    try {
+      await api('/staff/auth/logout', { method: 'POST' });
+    } catch {
+      // A waking server or a lost connection: this browser still forgets the staff member.
+    }
     queryClient.removeQueries({ queryKey: ['staff-me'] });
     navigate('/admin/login');
   }

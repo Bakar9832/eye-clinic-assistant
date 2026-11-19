@@ -115,6 +115,37 @@ describe('logging in', () => {
 
 });
 
+describe('W8. logging out', () => {
+  it('shows "Log in" at once, without a reload, and forgets personal data', async () => {
+    let loggedIn = true;
+    const api = mockApi({
+      'GET /me': () => (loggedIn ? { body: DEMO } : { status: 401, body: { error: 'UNAUTHENTICATED', reasons: [] } }),
+      'POST /auth/logout': () => ((loggedIn = false), { status: 204 }),
+      'GET /me/appointments': { body: [] },
+    });
+    renderApp('/my');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Log out' }));
+
+    expect((await screen.findAllByRole('link', { name: 'Log in' })).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Log out' })).not.toBeInTheDocument();
+    expect(screen.queryByText(DEMO.email)).not.toBeInTheDocument();
+    expect(api.calls.some((c) => c.path === '/auth/logout')).toBe(true);
+  });
+
+  it('still logs out in this browser when the request fails', async () => {
+    mockApi({
+      'GET /me': { body: DEMO },
+      'POST /auth/logout': { status: 503, body: { error: 'HTTP_503', reasons: [] } },
+    });
+    renderApp('/');
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Log out' }));
+
+    expect((await screen.findAllByRole('link', { name: 'Log in' })).length).toBeGreaterThan(0);
+  });
+});
+
 describe('W7. finding your details', () => {
   const INCOMPLETE = { ...DEMO, fullName: null, hasDateOfBirth: false, profileComplete: false };
 

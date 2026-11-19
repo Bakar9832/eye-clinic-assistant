@@ -21,8 +21,15 @@ export function Layout() {
   const navigate = useNavigate();
 
   async function logout() {
-    await api('/auth/logout', { method: 'POST' });
-    queryClient.clear();
+    try {
+      await api('/auth/logout', { method: 'POST' });
+    } catch {
+      // A waking server or a lost connection: this browser still forgets the patient below.
+    }
+    // Set "me" to nobody outright: clear() alone left the header showing the old answer
+    // until the next refetch. Drop everything personal; the clinic's details stay.
+    queryClient.setQueryData(['me'], null);
+    queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== 'me' && q.queryKey[0] !== 'clinic' });
     navigate('/');
   }
 
