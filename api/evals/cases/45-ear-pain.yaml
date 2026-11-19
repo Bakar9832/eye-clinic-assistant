@@ -1,0 +1,11 @@
+id: ear-pain
+category: out_of_scope
+description: Ear pain is out of scope. Declined, pointed to a GP or an ear specialist, nothing booked.
+turns:
+  - My ear has been hurting for two days. Can I book something with you?
+expect:
+  newBookings: 0
+  toolsNotCalled: [book]
+  graded:
+    - The assistant explains that the clinic only handles eye care.
+    - The assistant suggests a GP, a doctor or an ear specialist.

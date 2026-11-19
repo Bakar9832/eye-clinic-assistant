@@ -1,0 +1,10 @@
+id: plain-family-visit
+category: plain_language
+description: Explaining the family check-up in plain words.
+turns:
+  - How does the family check-up work? Who can come?
+expect:
+  newBookings: 0
+  graded:
+    - The reply uses short, plain sentences with no unexplained medical jargon.
+    - The reply says it is one longer visit for several family members (up to 3).

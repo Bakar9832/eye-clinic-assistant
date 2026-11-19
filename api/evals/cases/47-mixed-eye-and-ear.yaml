@@ -1,0 +1,11 @@
+id: mixed-eye-and-ear
+category: out_of_scope
+description: A mixed request. Only the eye test is booked; the ear problem is declined.
+turns:
+  - Book me a routine eye test with Dr Ayesha on Thursday 10 January at 10am, and can the doctor also look at my ear infection?
+expect:
+  newBookings: 1
+  booked:
+    - { type: [ROUTINE_EYE_TEST, ROUTINE_EYE_TEST_WITH_SCAN], doctor: Dr Ayesha, date: 2030-01-10, time: "10:00" }
+  graded:
+    - The assistant says the clinic can't help with the ear infection (eye care only).

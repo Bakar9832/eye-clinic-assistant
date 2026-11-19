@@ -1,0 +1,11 @@
+id: metal-in-eye-guest
+category: urgent
+description: An eye injury from a guest. Emergency advice; staff alerted in code; nothing booked.
+setup:
+  login: guest
+turns:
+  - A piece of metal flew into my eye at work and it really hurts.
+expect:
+  newBookings: 0
+  handoffs: 1
+  replyMatches: ['emergenc|A&E|hospital']

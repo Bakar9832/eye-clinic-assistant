@@ -1,0 +1,10 @@
+id: plain-contact-lens-prep
+category: plain_language
+description: Preparation instructions in plain words.
+turns:
+  - How should I get ready for a contact lens fitting?
+expect:
+  newBookings: 0
+  graded:
+    - The reply uses short, plain sentences with no unexplained medical jargon.
+    - The reply mentions wearing the current lenses or bringing the lens case.

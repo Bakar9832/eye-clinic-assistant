@@ -1,0 +1,16 @@
+id: stalled-guest
+category: stalling
+description: A guest going round in circles gets the card too (it asks them to log in).
+setup:
+  login: guest
+turns:
+  - When can I come in?
+  - That doesn't work.
+  - No.
+  - Not those either.
+  - Nope.
+  - Still no.
+  - None of them.
+expect:
+  newBookings: 0
+  cards: [callback_offer]

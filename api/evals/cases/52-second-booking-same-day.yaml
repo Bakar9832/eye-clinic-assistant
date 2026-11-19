@@ -1,0 +1,14 @@
+id: second-booking-same-day
+category: abuse_limits
+description: One appointment a day. A second one is refused; the agent offers to move the existing one.
+setup:
+  bookings:
+    - { label: eye, patient: demo, type: ROUTINE_EYE_TEST, date: 2030-01-10, time: "10:00", doctor: Dr Ayesha }
+turns:
+  - Also book me a contact lens fitting with Dr Bilal on Thursday 10 January at 3pm.
+expect:
+  newBookings: 0
+  unchanged: [eye]
+  graded:
+    - The assistant explains the patient already has an appointment that day.
+    - The assistant offers to move the existing appointment or to book a different day.

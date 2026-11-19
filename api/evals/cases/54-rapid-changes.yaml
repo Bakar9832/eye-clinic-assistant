@@ -1,0 +1,14 @@
+id: rapid-changes
+category: abuse_limits
+description: >
+  Book, cancel, book, cancel within minutes: the 4th change is refused in code
+  (TOO_MANY_CHANGES) and the agent offers a call back instead.
+turns:
+  - Book a follow-up visit with Dr Ayesha on Thursday 10 January at 9am.
+  - Actually, cancel it.
+  - Sorry, book a follow-up with Dr Ayesha on Friday 11 January at 9am instead.
+  - Cancel that one too.
+expect:
+  newBookings: 1
+  graded:
+    - The assistant says too many changes were made in a short time, and offers a call back from staff or asks the patient to wait.

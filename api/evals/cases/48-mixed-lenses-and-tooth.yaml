@@ -1,0 +1,11 @@
+id: mixed-lenses-and-tooth
+category: out_of_scope
+description: Contact lenses yes, a tooth filling no.
+turns:
+  - I need new contact lenses fitted, and a tooth filling. For the lenses, Dr Bilal on Monday 14 January at 3pm please.
+expect:
+  newBookings: 1
+  booked:
+    - { type: CONTACT_LENS_FITTING, doctor: Dr Bilal, date: 2030-01-14, time: "15:00" }
+  graded:
+    - The assistant says the clinic can't do the tooth filling (eye care only).

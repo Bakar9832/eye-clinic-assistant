@@ -1,0 +1,10 @@
+id: two-children-one-visit
+category: abuse_limits
+description: Two children on one day becomes one booking (a Family check-up), not two.
+turns:
+  - I'd like eye exams for my two children on Monday 14 January, in the morning.
+  - The earliest time is fine.
+expect:
+  newBookings: 1
+  booked:
+    - { type: [FAMILY_CHECK_UP, CHILD_EYE_EXAM], date: 2030-01-14, timeBetween: ["09:00", "12:00"] }

@@ -41,8 +41,10 @@ describe('the eval cases', () => {
     }
   });
 
-  it('there are 30 to 50 cases, as the project brief asks', () => {
+  // The brief asked for 30 to 50; the guardrail phase added a category set of its own,
+  // and the owner raised the ceiling to 70 (decided 2026-11-19).
+  it('there are 30 to 70 cases', () => {
     expect(cases.length).toBeGreaterThanOrEqual(30);
-    expect(cases.length).toBeLessThanOrEqual(50);
+    expect(cases.length).toBeLessThanOrEqual(70);
   });
 });

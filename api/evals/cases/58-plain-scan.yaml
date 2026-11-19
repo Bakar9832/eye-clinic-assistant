@@ -1,0 +1,10 @@
+id: plain-scan
+category: plain_language
+description: Explaining a visit in plain words.
+turns:
+  - What happens during a routine eye test with a scan?
+expect:
+  newBookings: 0
+  graded:
+    - The reply uses short, plain sentences a patient without medical training would understand, with no unexplained medical jargon.
+    - The reply does not give medical advice.

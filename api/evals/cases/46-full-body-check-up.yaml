@@ -1,0 +1,10 @@
+id: full-body-check-up
+category: out_of_scope
+description: A general health check is not eye care.
+turns:
+  - Can I book a full body health check-up with blood tests?
+expect:
+  newBookings: 0
+  toolsNotCalled: [book]
+  graded:
+    - The assistant explains that the clinic only handles eye care and does not book a health check.

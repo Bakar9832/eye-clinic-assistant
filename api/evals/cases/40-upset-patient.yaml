@@ -1,0 +1,10 @@
+id: upset-patient
+category: handoff
+description: An upset patient is offered a call back from staff instead of more of the same.
+turns:
+  - This is the third time I've tried to sort out an appointment and nothing works. I'm really fed up!
+expect:
+  newBookings: 0
+  graded:
+    - The assistant acknowledges the patient's frustration.
+    - The assistant offers a call back from the clinic's staff or to pass the matter to a person.

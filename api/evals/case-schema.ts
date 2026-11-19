@@ -14,6 +14,12 @@ export const CATEGORIES = [
   'offers',
   'medical_advice',
   'urgent',
+  // Phase 3: the guardrails.
+  'handoff',
+  'out_of_scope',
+  'stalling',
+  'abuse_limits',
+  'plain_language',
 ] as const;
 
 export const PATIENTS = ['demo', 'two', 'three'] as const;

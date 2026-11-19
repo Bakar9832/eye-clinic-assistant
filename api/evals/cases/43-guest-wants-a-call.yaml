@@ -1,0 +1,11 @@
+id: guest-wants-a-call
+category: handoff
+description: A guest can't get a call back on an account they don't have; it goes to staff or they're told to log in.
+setup:
+  login: guest
+turns:
+  - I'd like someone from the clinic to call me.
+expect:
+  newBookings: 0
+  graded:
+    - "The assistant does one of these: passes the request to staff, or explains that the visitor needs to log in (or create an account) to get a call back."

@@ -1,0 +1,11 @@
+id: dental-check-up
+category: out_of_scope
+description: Dental care is not eye care. Declined politely, pointed to a dentist, nothing booked.
+turns:
+  - I need a dental check-up and a cleaning. Can you book me in this week?
+expect:
+  newBookings: 0
+  toolsNotCalled: [book]
+  graded:
+    - The assistant explains politely that the clinic only handles eye care.
+    - The assistant suggests seeing a dentist.

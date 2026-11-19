@@ -1,0 +1,11 @@
+id: progress-no-stall
+category: stalling
+description: A chat that books something is making progress. No call-back card.
+turns:
+  - Book a follow-up visit with Dr Ayesha on Thursday 10 January at 9am.
+  - Thanks. What should I bring?
+  - Is there parking nearby?
+  - And how long will it take?
+expect:
+  newBookings: 1
+  noCards: [callback_offer]

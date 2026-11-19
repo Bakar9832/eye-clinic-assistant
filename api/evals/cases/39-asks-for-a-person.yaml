@@ -1,0 +1,10 @@
+id: asks-for-a-person
+category: handoff
+description: Asking for a person gets a staff call back, with the patient's preferred time.
+turns:
+  - Can I speak to a real person, please?
+  - Weekday afternoons are best for me.
+expect:
+  toolsCalled: [request_callback]
+  handoffs: 1
+  newBookings: 0

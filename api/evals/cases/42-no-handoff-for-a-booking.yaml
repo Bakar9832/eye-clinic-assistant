@@ -1,0 +1,11 @@
+id: no-handoff-for-a-booking
+category: handoff
+description: A plain booking needs no person. The agent books it and hands nothing over.
+turns:
+  - Book a follow-up visit with Dr Bilal on Thursday 10 January at 11am.
+expect:
+  newBookings: 1
+  booked:
+    - { type: FOLLOW_UP, doctor: Dr Bilal, date: 2030-01-10, time: "11:00" }
+  handoffs: 0
+  toolsNotCalled: [request_callback, handoff_to_staff]

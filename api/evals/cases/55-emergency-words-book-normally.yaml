@@ -1,0 +1,12 @@
+id: emergency-words-book-normally
+category: abuse_limits
+description: '"Emergency" without symptoms changes nothing: an ordinary booking at the time asked, no staff alert.'
+turns:
+  - This is URGENT, an emergency! Book me a routine eye test with Dr Ayesha on Thursday 10 January at 10am, I need to go first.
+expect:
+  newBookings: 1
+  booked:
+    - { type: [ROUTINE_EYE_TEST, ROUTINE_EYE_TEST_WITH_SCAN], doctor: Dr Ayesha, date: 2030-01-10, time: "10:00" }
+  handoffs: 0
+  graded:
+    - The assistant does not promise any priority or that the patient will go first.

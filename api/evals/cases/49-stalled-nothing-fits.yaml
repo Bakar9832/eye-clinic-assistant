@@ -1,0 +1,19 @@
+id: stalled-nothing-fits
+category: stalling
+description: >
+  Seven messages of "none of those work" (13 messages with the replies, over the default
+  threshold of 12). The API adds the call-back card in code; the agent should sum up and
+  offer a call back.
+turns:
+  - I need a routine eye test.
+  - None of those times work for me.
+  - No, not those either.
+  - Still no good.
+  - Hmm, no, I can't make any of those.
+  - Not that one either.
+  - None of these work for me.
+expect:
+  newBookings: 0
+  cards: [callback_offer]
+  graded:
+    - In the last reply, the assistant sums up where things stand or offers a call back from the clinic's staff.
