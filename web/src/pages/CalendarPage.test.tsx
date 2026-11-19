@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DEMO, mockApi, renderApp } from '../test/render';
 
@@ -110,5 +110,86 @@ describe('the booking calendar', () => {
       .getAllByRole('button')
       .map((b) => b.textContent);
     expect(doctors).toEqual(['Any doctor (soonest)', 'Dr Ayesha']);
+  });
+});
+
+describe('Book page states and keyboard (55+ redesign, phase 2)', () => {
+  /** Availability where `slotsFor(day)` decides each day's times (Karachi 10:00 = 05:00Z). */
+  function weekApi(slotsFor: (day: string) => 'one' | 'none' | 'error') {
+    return mockApi({
+      'GET /me': { status: 401, body: { error: 'UNAUTHENTICATED', reasons: [] } },
+      'GET /appointment-types': { body: TYPES },
+      'GET /availability': (call) => {
+        const day = new URLSearchParams(call.path.split('?')[1]).get('day')!;
+        const kind = slotsFor(day);
+        if (kind === 'error') return { status: 500, body: { error: 'HTTP_500', reasons: [] } };
+        const start = new Date(`${day}T05:00:00.000Z`).toISOString();
+        const slots = kind === 'one' ? [{ start, end: start, doctor: { id: 'doc-ayesha', displayName: 'Dr Ayesha' } }] : [];
+        return { body: { type: 'ROUTINE_EYE_TEST', day, timezone: 'Asia/Karachi', slots } };
+      },
+    });
+  }
+  const daysAsked = (api: ReturnType<typeof mockApi>) =>
+    api.calls.filter((c) => c.path.startsWith('/availability')).map((c) => new URLSearchParams(c.path.split('?')[1]).get('day')!);
+
+  it('B1. a week with no free times says so and Later moves to the next week', async () => {
+    const api = weekApi(() => 'none');
+    renderApp('/calendar');
+
+    expect(await screen.findByText('No free times this week, try later.')).toBeInTheDocument();
+    const week = screen.getByRole('group', { name: 'Pick a day' });
+    for (const day of within(week).getAllByRole('button')) expect(day).toBeDisabled();
+    const firstWeek = [...new Set(daysAsked(api))];
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Later' })[0]);
+    await waitFor(() => expect(new Set(daysAsked(api)).size).toBe(14));
+    expect(daysAsked(api).some((d) => !firstWeek.includes(d))).toBe(true);
+  });
+
+  it('B2. a day that fails to load shows an error with Retry, which asks again', async () => {
+    let failing = true;
+    let first: string | null = null; // the first day the page asks for fails
+    const api = weekApi((day) => {
+      first ??= day;
+      return failing && day === first ? 'error' : 'one';
+    });
+    renderApp('/calendar');
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent("We couldn't load the free times");
+    const before = api.calls.length;
+    failing = false;
+    await userEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(screen.queryByText(/couldn't load the free times/)).toBeNull());
+    expect(api.calls.length).toBeGreaterThan(before);
+  });
+
+  it('B3. arrow keys move between days and times; each group is a single Tab stop', async () => {
+    weekApi(() => 'one');
+    renderApp('/calendar');
+
+    const week = await screen.findByRole('group', { name: 'Pick a day' });
+    await waitFor(() => expect(within(week).getAllByRole('button').filter((b) => !b.hasAttribute('disabled'))).toHaveLength(7));
+    const days = within(week).getAllByRole('button');
+    expect(days.filter((b) => b.tabIndex === 0)).toHaveLength(1); // one Tab stop: the selected day
+    days[0].focus();
+    await userEvent.keyboard('{ArrowRight}');
+    expect(document.activeElement).toBe(days[1]);
+    await userEvent.keyboard('{End}');
+    expect(document.activeElement).toBe(days[6]);
+    await userEvent.keyboard('{Enter}');
+    expect(days[6]).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('B4. Earlier is off on the first week; a new week clears the chosen time', async () => {
+    weekApi(() => 'one');
+    renderApp('/calendar');
+
+    expect(await screen.findByRole('button', { name: /Earlier/ })).toBeDisabled();
+    await pickFirstSlot();
+    expect(screen.getByRole('link', { name: 'Log in to confirm' })).not.toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(screen.getByRole('button', { name: /Later/ }));
+    expect(await screen.findByText('Choose a time to continue.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Earlier/ })).toBeEnabled();
   });
 });

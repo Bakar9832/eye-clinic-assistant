@@ -4,7 +4,7 @@
 // background as well as colour (plus aria-pressed).
 
 import { Check, ChevronLeft, ChevronRight, Info } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import { TimeText } from '../../components/TimeText';
 import type { Availability } from '../../api/types';
 
@@ -46,6 +46,7 @@ export function Choice({
   children,
   label,
   className = '',
+  tabIndex,
 }: {
   selected: boolean;
   onSelect: () => void;
@@ -53,12 +54,15 @@ export function Choice({
   children: ReactNode;
   label?: string;
   className?: string;
+  /** For a roving tab stop: -1 for every button in a group except the current one. */
+  tabIndex?: number;
 }) {
   return (
     <button
       type="button"
       aria-pressed={selected}
       aria-label={label}
+      tabIndex={tabIndex}
       disabled={disabled}
       onClick={onSelect}
       className={`relative min-h-12 rounded-lg border-2 px-4 py-3 text-left ${
@@ -69,6 +73,30 @@ export function Choice({
       {children}
     </button>
   );
+}
+
+/**
+ * Arrow keys (and Home/End) move focus between the enabled buttons of a group, so a
+ * keyboard user doesn't have to Tab through every day or time; the group is one Tab stop.
+ */
+export function arrowKeys(event: KeyboardEvent<HTMLElement>) {
+  const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+  if (!keys.includes(event.key)) return;
+  const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')];
+  const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+  if (current === -1 || buttons.length === 0) return;
+  event.preventDefault();
+  const next =
+    event.key === 'Home' ? 0
+    : event.key === 'End' ? buttons.length - 1
+    : event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? Math.max(0, current - 1)
+    : Math.min(buttons.length - 1, current + 1);
+  buttons[next].focus();
+}
+
+/** Which button of a group takes the Tab stop: the selected one, else the first enabled one. */
+function tabStop<T>(items: T[], isSelected: (item: T) => boolean, isEnabled: (item: T) => boolean) {
+  return items.find((i) => isSelected(i) && isEnabled(i)) ?? items.find(isEnabled);
 }
 
 export interface VisitType {
@@ -159,8 +187,10 @@ export function WeekStrip({
         <ChevronLeft aria-hidden className="size-5" />
         <span className="text-base">Earlier</span>
       </button>
-      <div role="group" aria-label="Pick a day" className="grid min-w-0 flex-1 grid-cols-7 gap-2">
+      <div role="group" aria-label="Pick a day" onKeyDown={arrowKeys} className="grid min-w-0 flex-1 grid-cols-7 gap-2">
         {days.map((d) => {
+          const enabled = (x: DayInfo) => x.status === 'ready' && x.slots.length > 0;
+          const stop = tabStop(days, (x) => x.day === selected, enabled);
           const free = d.slots.length;
           const empty = d.status === 'ready' && free === 0;
           const label = `${d.fullName}${d.relative ? ` (${d.relative.toLowerCase()})` : ''}, ${
@@ -171,7 +201,8 @@ export function WeekStrip({
               key={d.day}
               label={label}
               selected={selected === d.day}
-              disabled={d.status !== 'ready' || empty}
+              disabled={!enabled(d)}
+              tabIndex={stop?.day === d.day ? 0 : -1}
               onSelect={() => onSelect(d.day)}
               className="flex flex-col items-center justify-center gap-0.5 px-1 py-2 text-center"
             >
@@ -179,6 +210,8 @@ export function WeekStrip({
               <span className="text-2xl leading-none font-semibold tabular-nums">{d.date}</span>
               <span className="text-base">{d.month}</span>
               {empty && <span className="text-sm">No times</span>}
+              {d.status === 'loading' && <span aria-hidden className="mt-1 h-3 w-10 animate-pulse rounded bg-slate-200" />}
+              {d.status === 'error' && <span className="text-sm">Not loaded</span>}
             </Choice>
           );
         })}
@@ -206,13 +239,21 @@ export function TimeGrid({
   isSelected: (slot: Slot) => boolean;
   onSelect: (slot: Slot) => void;
 }) {
+  const all = [...morning, ...afternoon];
+  const stop = tabStop(all, isSelected, () => true);
   const group = (title: string, slots: Slot[]) =>
     slots.length > 0 && (
       <div className="space-y-2">
         <h3 className="text-lg">{title}</h3>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {slots.map((slot) => (
-            <Choice key={slot.start + (slot.doctor?.id ?? '')} selected={isSelected(slot)} onSelect={() => onSelect(slot)} className="pr-10 text-lg">
+            <Choice
+              key={slot.start + (slot.doctor?.id ?? '')}
+              selected={isSelected(slot)}
+              onSelect={() => onSelect(slot)}
+              tabIndex={slot === stop ? 0 : -1}
+              className="pr-10 text-lg"
+            >
               <TimeText iso={slot.start} compact />
               {slot.doctor && <span className={`block text-base ${isSelected(slot) ? 'text-slate-200' : 'text-ink-muted'}`}>{slot.doctor.displayName}</span>}
             </Choice>
@@ -221,7 +262,7 @@ export function TimeGrid({
       </div>
     );
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" onKeyDown={arrowKeys}>
       {group('Morning', morning)}
       {group('Afternoon', afternoon)}
     </div>
@@ -237,6 +278,18 @@ export function PrepNote({ text }: { text: string }) {
         <p className="font-medium">Before your visit</p>
         <p className="text-ink-muted">{text}</p>
       </div>
+    </div>
+  );
+}
+
+/** Placeholder time buttons while the day's free times load. */
+export function TimeGridSkeleton() {
+  return (
+    <div aria-busy="true" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+      <span className="sr-only">Loading free times…</span>
+      {Array.from({ length: 8 }, (_, i) => (
+        <div key={i} aria-hidden className="h-16 animate-pulse rounded-lg bg-slate-100" />
+      ))}
     </div>
   );
 }

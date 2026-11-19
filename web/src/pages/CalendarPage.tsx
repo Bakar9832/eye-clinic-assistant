@@ -1,6 +1,6 @@
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DateTime } from 'luxon';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { api, errorText } from '../api/client';
 import type { AppointmentType, Availability, Ticket } from '../api/types';
@@ -9,7 +9,7 @@ import { TicketCard } from '../components/cards';
 import { ProfileForm } from '../components/ProfileForm';
 import { TimeText } from '../components/TimeText';
 import { daysFrom, todayIn } from '../time/zones';
-import { DoctorPicker, PrepNote, Step, TimeGrid, VisitTypePicker, WeekStrip, type DayInfo, type Slot } from './book/parts';
+import { DoctorPicker, PrepNote, Step, TimeGrid, TimeGridSkeleton, VisitTypePicker, WeekStrip, type DayInfo, type Slot } from './book/parts';
 
 const DEFAULT_TYPE = 'ROUTINE_EYE_TEST';
 const primary = 'min-h-12 rounded-lg bg-ink px-6 font-semibold text-white hover:bg-slate-800 disabled:bg-slate-200 disabled:text-slate-500';
@@ -30,10 +30,15 @@ export function CalendarPage() {
   const doctorId = params.get('doctor') ?? '';
   const today = clinic ? todayIn(clinic.timezone) : null;
   const dayParam = params.get('day');
-  // The week the chosen day is in, else this week.
-  const [week, setWeek] = useState(() =>
-    today && dayParam ? Math.max(0, Math.floor(DateTime.fromISO(dayParam).diff(DateTime.fromISO(today), 'days').days / 7)) : 0,
-  );
+  // The week the chosen day is in (e.g. back from login), else this week. Worked out once
+  // the clinic's "today" is known.
+  const [week, setWeek] = useState(0);
+  const [weekFromAddress, setWeekFromAddress] = useState(false);
+  useEffect(() => {
+    if (!today || weekFromAddress) return;
+    setWeekFromAddress(true);
+    if (dayParam) setWeek(Math.max(0, Math.floor(DateTime.fromISO(dayParam).diff(DateTime.fromISO(today), 'days').days / 7)));
+  }, [today, dayParam, weekFromAddress]);
 
   /** Changes the choice in the address (replace: no new history entry per tap). */
   const choose = (change: Record<string, string | null>) =>
@@ -86,6 +91,15 @@ export function CalendarPage() {
   const sameSlot = (a: Slot, start: string | null, doctor: string | null) => a.start === start && (a.doctor?.id ?? null) === (doctor || null);
   const chosen = slots.find((s) => sameSlot(s, params.get('start'), params.get('slotDoctor'))) ?? null;
   const soonest = withTimes[0]?.slots[0] ?? null;
+  const loadingWeek = days.length === 0 || days.some((d) => d.status === 'loading');
+  const failedDays = days.filter((d) => d.status === 'error');
+  const emptyWeek = days.length > 0 && days.every((d) => d.status === 'ready' && d.slots.length === 0);
+  const retryFailed = () => availability.forEach((q) => q.isError && void q.refetch());
+  /** Earlier/Later: a new week starts with no day or time chosen (its first free day is picked). */
+  const moveWeek = (by: number) => {
+    setWeek((w) => Math.max(0, w + by));
+    choose({ day: null, start: null, slotDoctor: null });
+  };
 
   const hourOf = (slot: Slot) => (clinic ? DateTime.fromISO(slot.start, { zone: clinic.timezone }).hour : 0);
   const morning = slots.filter((s) => hourOf(s) < 12);
@@ -151,9 +165,25 @@ export function CalendarPage() {
           selected={selectedDay?.day ?? null}
           onSelect={(day) => choose({ day, start: null, slotDoctor: null })}
           canGoEarlier={week > 0}
-          onEarlier={() => setWeek((w) => Math.max(0, w - 1))}
-          onLater={() => setWeek((w) => w + 1)}
+          onEarlier={() => moveWeek(-1)}
+          onLater={() => moveWeek(1)}
         />
+        {failedDays.length > 0 && (
+          <div role="alert" className="flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-danger-soft p-4 text-red-900">
+            <span>We couldn't load the free times for {failedDays.length === 1 ? failedDays[0].fullName : `${failedDays.length} days`}.</span>
+            <button type="button" onClick={retryFailed} className="min-h-12 rounded-lg border-2 border-red-300 bg-white px-5 font-semibold text-red-900">
+              Retry
+            </button>
+          </div>
+        )}
+        {emptyWeek && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-line p-5">
+            <span>No free times this week, try later.</span>
+            <button type="button" onClick={() => moveWeek(1)} className={primary}>
+              Later
+            </button>
+          </div>
+        )}
       </Step>
 
       <Step id="step-time" number={3} title="Pick a time">
@@ -162,8 +192,10 @@ export function CalendarPage() {
             <p className="text-ink-muted">{selectedDay.fullName}. Times are in clinic time.</p>
             <TimeGrid morning={morning} afternoon={afternoon} isSelected={(s) => chosen === s} onSelect={(s) => pick(s, selectedDay.day)} />
           </>
+        ) : loadingWeek ? (
+          <TimeGridSkeleton />
         ) : (
-          <p className="text-ink-muted">Pick a day with free times first.</p>
+          <p className="text-ink-muted">{emptyWeek ? 'No free times this week. Use Later to see the next week.' : 'Pick a day with free times first.'}</p>
         )}
       </Step>
 
