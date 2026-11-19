@@ -28,6 +28,8 @@ const QUICK_ACTIONS: { label: string; message: string; loggedIn?: boolean }[] = 
   { label: 'Are my results in?', message: 'Are my results in?', loggedIn: true },
 ];
 
+const SLOW_REPLY_MS = 8_000;
+
 const GREETING =
   "Hi! I can check free times, book, move or cancel appointments, and tell you when your results are in. What can I do for you?";
 
@@ -39,7 +41,16 @@ export function ChatPage() {
   const [bubbles, setBubbles] = useState<Bubble[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  const [slow, setSlow] = useState(false);
   const end = useRef<HTMLDivElement>(null);
+  // Until we know who is chatting, the conversation key isn't final: a message sent then
+  // was wiped when the login check answered (seen on a cold start). So wait for it.
+  const connecting = me === undefined;
+
+  // Wake the agent service while the patient is still reading (free hosting sleeps).
+  useEffect(() => {
+    void api('/chat/warm', { method: 'POST' }).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     setConversationId(sessionStorage.getItem(storageKey));
@@ -56,18 +67,22 @@ export function ChatPage() {
   async function exchange(text: string, request: () => Promise<ChatReply>) {
     setBubbles((b) => [...b, { role: 'user', text }]);
     setBusy(true);
+    // A reply this slow is usually the service waking up: say so, so it isn't taken for a failure.
+    const slowTimer = setTimeout(() => setSlow(true), SLOW_REPLY_MS);
     try {
       const reply = await request();
       setBubbles((b) => [...b, { role: 'assistant', text: reply.reply, cards: reply.cards }]);
     } catch (err) {
       setBubbles((b) => [...b, { role: 'error', text: errorText(err) }]);
     } finally {
+      clearTimeout(slowTimer);
+      setSlow(false);
       setBusy(false);
     }
   }
 
   async function send(text: string) {
-    if (!text.trim() || busy) return;
+    if (!text.trim() || busy || connecting) return;
     const ask = (id: string | null) =>
       api<ChatReply>('/chat', { method: 'POST', body: { message: text, viewerTimezone: viewerZone, ...(id ? { conversationId: id } : {}) } });
     await exchange(text, async () => {
@@ -106,6 +121,8 @@ export function ChatPage() {
 
   function submit(e: FormEvent) {
     e.preventDefault();
+    // Keep what was typed if it can't be sent yet (a reply is pending, or still connecting).
+    if (!input.trim() || busy || connecting) return;
     const text = input;
     setInput('');
     void send(text);
@@ -133,7 +150,7 @@ export function ChatPage() {
             // On wide screens these are in the side panel instead.
             <div className="flex flex-wrap gap-2 xl:hidden">
               {actions.map((a) => (
-                <button key={a.label} onClick={() => void send(a.message)} disabled={busy} className={chipClass}>
+                <button key={a.label} onClick={() => void send(a.message)} disabled={busy || connecting} className={chipClass}>
                   {a.label}
                 </button>
               ))}
@@ -153,12 +170,13 @@ export function ChatPage() {
                       onOtherTime: () => void send(OTHER_TIME_MESSAGE),
                     }}
                     callback={{ active: i === bubbles.length - 1 && !busy, onRequest: () => void requestCallback() }}
+                    slots={{ active: i === bubbles.length - 1 && !busy, onPick: (offer) => void confirmBooking(offer) }}
                   />
                 </div>
               ))}
             </div>
           ))}
-          {busy && <p className="text-slate-500">Thinking…</p>}
+          {busy && <p className="text-slate-500">{slow ? 'Waking up the assistant: the first reply can take up to a minute…' : 'Thinking…'}</p>}
           <div ref={end} />
         </div>
 
@@ -168,10 +186,11 @@ export function ChatPage() {
             value={input}
             maxLength={1000}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="e.g. Book an eye test with Dr Ayesha next Tuesday morning"
+            disabled={connecting}
+            placeholder={connecting ? 'Connecting…' : 'e.g. Book an eye test with Dr Ayesha next Tuesday morning'}
             className="flex-1 rounded-lg border border-slate-300 px-4 py-3 text-lg focus:border-brand-600 focus:outline-none"
           />
-          <button disabled={busy || !input.trim()} className="rounded-lg bg-brand-600 px-6 py-3 text-lg font-medium text-white disabled:opacity-50">
+          <button disabled={busy || connecting || !input.trim()} className="rounded-lg bg-brand-600 px-6 py-3 text-lg font-medium text-white disabled:opacity-50">
             Send
           </button>
         </form>
@@ -182,7 +201,7 @@ export function ChatPage() {
           <h2 className="mb-3 font-medium">Try asking</h2>
           <div className="flex flex-col gap-2">
             {actions.map((a) => (
-              <button key={a.label} onClick={() => void send(a.message)} disabled={busy} className={`${chipClass} text-left`}>
+              <button key={a.label} onClick={() => void send(a.message)} disabled={busy || connecting} className={`${chipClass} text-left`}>
                 {a.label}
               </button>
             ))}

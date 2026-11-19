@@ -142,6 +142,24 @@ describe('T3b. appointment types the model can choose from', () => {
   });
 });
 
+describe('T3c. free times as buttons', () => {
+  it('a logged-in patient gets a slot_choices card from the real free times (at most 8); a guest gets none', async () => {
+    const { client } = await asPatient();
+    const result = await call(client, 'check_availability', { type: 'FOLLOW_UP', date_from: MON, doctor: 'Dr Ayesha' });
+    const [card] = cardsOf(result) as { type: string; typeCode: string; typeName: string; slots: { start: string; doctorId: string; doctor: string }[] }[];
+
+    expect(card).toMatchObject({ type: 'slot_choices', typeCode: 'FOLLOW_UP', typeName: 'Follow-up visit' });
+    expect(card.slots.length).toBeGreaterThan(0);
+    expect(card.slots.length).toBeLessThanOrEqual(8);
+    expect(card.slots[0]).toMatchObject({ doctorId: clinic.resources.ayesha.id, doctor: 'Dr Ayesha' });
+    const days = toolData(result).days as { slots: { clinic_time: string }[] }[];
+    expect(DateTime.fromISO(card.slots[0].start, { zone: ZONE }).toFormat('HH:mm')).toBe(days[0].slots[0].clinic_time);
+
+    const guest = await mcpClient(t, await agentTokenFor(t, t.browser()));
+    expect(cardsOf(await call(guest, 'check_availability', { type: 'FOLLOW_UP', date_from: MON }))).toEqual([]);
+  });
+});
+
 describe('T2. without login', () => {
   it('public tools work; patient tools say LOGIN_REQUIRED', async () => {
     const client = await mcpClient(t, await agentTokenFor(t, t.browser()));

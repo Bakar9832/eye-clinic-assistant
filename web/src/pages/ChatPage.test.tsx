@@ -4,6 +4,8 @@ import { DEMO, mockApi, renderApp } from '../test/render';
 import { DOB_CONFIRMED_MESSAGE, OTHER_TIME_MESSAGE } from './ChatPage';
 
 async function say(text: string) {
+  // The box is disabled until the login check answers, as for a real visitor.
+  await waitFor(() => expect(screen.getByLabelText('Message')).toBeEnabled());
   await userEvent.type(screen.getByLabelText('Message'), text);
   await userEvent.click(screen.getByRole('button', { name: 'Send' }));
 }
@@ -122,6 +124,71 @@ describe('the chat', () => {
     const note = screen.getByText('Chatting as a guest:').closest('p')!;
     expect(note).toHaveTextContent('Chatting as a guest: ask about appointments and when doctors are free. Log in to book or see your results.');
     expect(within(note).getByRole('link', { name: 'Log in' })).toHaveAttribute('href', '/login');
+  });
+
+  describe('W-FIX. the first message, Enter, and tappable times', () => {
+    it('while the login check is pending the box says Connecting… and nothing can be sent; then it works', async () => {
+      let answer!: () => void;
+      const loaded = new Promise<void>((resolve) => (answer = resolve));
+      const api = mockApi({
+        'GET /me': async () => {
+          await loaded;
+          return { body: DEMO };
+        },
+        'POST /chat': { body: { conversationId: 'c', reply: 'Hello!', cards: [] } },
+      });
+      renderApp('/');
+
+      const box = await screen.findByPlaceholderText('Connecting…');
+      expect(box).toBeDisabled();
+      expect(api.calls.some((c) => c.path === '/chat')).toBe(false);
+
+      answer();
+      await say('Hi');
+      expect(await screen.findByText('Hello!')).toBeInTheDocument();
+      expect(screen.getByText('Hi')).toBeInTheDocument(); // the message stays: no reset after loading
+    });
+
+    it('Enter sends the message, the same as the Send button', async () => {
+      const api = mockApi({ 'GET /me': { body: DEMO }, 'POST /chat': { body: { conversationId: 'c', reply: 'Got it.', cards: [] } } });
+      renderApp('/');
+      await waitFor(() => expect(screen.getByLabelText('Message')).toBeEnabled());
+      await userEvent.type(screen.getByLabelText('Message'), 'Hello there{Enter}');
+
+      expect(await screen.findByText('Got it.')).toBeInTheDocument();
+      expect(api.calls.find((c) => c.path === '/chat')?.body).toMatchObject({ message: 'Hello there' });
+    });
+
+    it('opening the chat wakes the agent service', async () => {
+      const api = mockApi({ 'GET /me': { body: DEMO } });
+      renderApp('/');
+      await waitFor(() => expect(api.calls.some((c) => c.method === 'POST' && c.path === '/chat/warm')).toBe(true));
+    });
+
+    it('free times come as buttons; a tap books that time through the API', async () => {
+      const start = '2030-01-07T05:00:00.000Z';
+      const api = mockApi({
+        'GET /me': { body: DEMO },
+        'POST /chat': {
+          body: {
+            conversationId: 'conv-1',
+            reply: 'The closest are 10:00 AM and 10:30 AM.',
+            cards: [{ type: 'slot_choices', typeCode: 'FOLLOW_UP', typeName: 'Follow-up visit', slots: [{ start, doctorId: 'doc-1', doctor: 'Dr Ayesha' }, { start: '2030-01-07T05:30:00.000Z', doctorId: 'doc-1', doctor: 'Dr Ayesha' }] }],
+          },
+        },
+        'POST /chat/conv-1/book': {
+          body: { conversationId: 'conv-1', reply: 'Booked. Your reference is EC-ABC123.', cards: [{ type: 'ticket', reference: 'EC-ABC123', start, doctor: 'Dr Ayesha', prepInstructions: '' }] },
+        },
+      });
+      renderApp('/');
+
+      await say('When can I see Dr Ayesha on Monday?');
+      const times = await screen.findByRole('region', { name: 'Free times' });
+      await userEvent.click(within(times).getAllByRole('button')[0]);
+
+      expect(await screen.findByRole('region', { name: 'Booking ticket' })).toHaveTextContent('EC-ABC123');
+      expect(api.calls.find((c) => c.path === '/chat/conv-1/book')?.body).toEqual({ typeCode: 'FOLLOW_UP', start, doctorId: 'doc-1' });
+    });
   });
 
   describe('W-CB. a stalled chat offers a call back', () => {

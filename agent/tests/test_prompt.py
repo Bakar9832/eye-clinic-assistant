@@ -51,3 +51,5 @@ def test_guardrail_rules_are_in_the_prompt():
     assert "no priority" in prompt
     # The old rule sent patients to an urgent slot they can no longer book.
     assert "earliest URGENT_VISIT" not in prompt
+    # Times are tappable buttons on the page: no bulleted lists of them.
+    assert "never as a bulleted list" in prompt

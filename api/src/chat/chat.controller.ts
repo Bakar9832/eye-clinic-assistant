@@ -206,6 +206,17 @@ export class ChatController {
   }
 
   /**
+   * Opening the chat page wakes the agent service in the background (free hosting puts it
+   * to sleep), so the first message doesn't wait for it. Answers at once; no login needed.
+   */
+  @Post('warm')
+  @HttpCode(HttpStatus.ACCEPTED)
+  warm() {
+    void this.agent.warm();
+    return { warming: true };
+  }
+
+  /**
    * The "Request a call back" button. Like Confirm, the click is the request: no model in
    * between. Both sides go into the conversation so the agent knows on its next turn.
    */

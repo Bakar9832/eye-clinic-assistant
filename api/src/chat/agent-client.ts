@@ -31,6 +31,9 @@ export interface AgentTurnResponse {
 /** Runs one turn of the agent. The real one is the Python service; tests use a fake. */
 export abstract class AgentClient {
   abstract turn(request: AgentTurnRequest): Promise<AgentTurnResponse>;
+
+  /** Wakes a sleeping agent service (free hosting) before the first message. Never throws. */
+  async warm(): Promise<void> {}
 }
 
 /** Calls the Python agent service over HTTP (Slice 3b). */
@@ -48,5 +51,10 @@ export class HttpAgentClient extends AgentClient {
     });
     if (!res.ok) throw new Error(`Agent service answered ${res.status}`);
     return (await res.json()) as AgentTurnResponse;
+  }
+
+  async warm(): Promise<void> {
+    // Its health check is enough to start a sleeping service; the answer doesn't matter.
+    await fetch(`${this.url}/health`, { signal: AbortSignal.timeout(90_000) }).catch(() => undefined);
   }
 }

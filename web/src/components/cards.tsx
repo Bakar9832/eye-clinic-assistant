@@ -168,16 +168,51 @@ function CallbackOfferCard({ card, active, onRequest }: { card: Extract<Card, { 
   );
 }
 
+/**
+ * The free times as buttons. A tap books that time through the page (the tap is the
+ * patient's choice), the same way as Confirm on a booking offer.
+ */
+function SlotChoicesCard({
+  card,
+  active,
+  onPick,
+}: {
+  card: Extract<Card, { type: 'slot_choices' }>;
+  active: boolean;
+  onPick: (offer: Offer) => void;
+}) {
+  return (
+    <section aria-label="Free times" className="space-y-2 rounded-lg border bg-white p-4">
+      <p className="text-sm text-slate-600">{card.typeName}: tap a time to book it</p>
+      <div className="flex flex-wrap gap-2">
+        {card.slots.map((s) => (
+          <button
+            key={s.start}
+            onClick={() => onPick({ type: 'booking_offer', typeCode: card.typeCode, typeName: card.typeName, start: s.start, doctorId: s.doctorId, doctor: s.doctor })}
+            disabled={!active}
+            className="rounded-lg border border-brand-100 bg-brand-50 px-3 py-2 text-left text-brand-800 hover:border-brand-600 disabled:opacity-50"
+          >
+            <TimeText iso={s.start} />
+            {s.doctor && <span className="block text-xs text-slate-500">{s.doctor}</span>}
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function CardView({
   card,
   onDobVerified,
   offer,
   callback,
+  slots,
 }: {
   card: Card;
   onDobVerified: () => void;
   offer?: OfferActions;
   callback?: { active: boolean; onRequest: () => void };
+  slots?: { active: boolean; onPick: (offer: Offer) => void };
 }) {
   switch (card.type) {
     case 'doctor_note':
@@ -188,6 +223,8 @@ export function CardView({
       return <DobCard onVerified={onDobVerified} />;
     case 'booking_offer':
       return <BookingOfferCard card={card} actions={offer ?? { active: false, onConfirm: () => {}, onOtherTime: () => {} }} />;
+    case 'slot_choices':
+      return <SlotChoicesCard card={card} active={slots?.active ?? false} onPick={slots?.onPick ?? (() => {})} />;
     case 'callback_offer':
       return <CallbackOfferCard card={card} active={callback?.active ?? false} onRequest={callback?.onRequest ?? (() => {})} />;
   }

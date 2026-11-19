@@ -224,3 +224,10 @@ describe('C. Confirm on a booking offer: the click books, not the model', () => 
     expect(await t.prisma.appointment.count()).toBe(0);
   });
 });
+
+describe('waking the agent', () => {
+  it('POST /chat/warm answers at once, without login', async () => {
+    const res = await t.http().post('/chat/warm').send({}).expect(202);
+    expect(res.body).toEqual({ warming: true });
+  });
+});

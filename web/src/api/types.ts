@@ -64,7 +64,9 @@ export type Card =
   | { type: 'ticket'; reference: string; start: string; doctor: string | null; prepInstructions: string }
   | { type: 'booking_offer'; typeCode: string; typeName: string; start: string; doctorId: string | null; doctor: string | null }
   /** Added by the API when a chat stalls: ask the clinic to call back. */
-  | { type: 'callback_offer'; loggedIn: boolean };
+  | { type: 'callback_offer'; loggedIn: boolean }
+  /** The free times the agent found, as buttons: a tap books that time. */
+  | { type: 'slot_choices'; typeCode: string; typeName: string; slots: { start: string; doctorId: string | null; doctor: string | null }[] };
 
 export interface ChatReply {
   conversationId: string;

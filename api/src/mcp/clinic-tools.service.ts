@@ -24,7 +24,9 @@ export type Card =
   // question is never turned into a booking by the model.
   | { type: 'booking_offer'; typeCode: string; typeName: string; start: string; doctorId: string | null; doctor: string | null }
   // Added by the chat (not a tool) when a conversation stalls: a button to ask for a call back.
-  | { type: 'callback_offer'; loggedIn: boolean };
+  | { type: 'callback_offer'; loggedIn: boolean }
+  // The free times check_availability found, as buttons. A tap books that time from the page.
+  | { type: 'slot_choices'; typeCode: string; typeName: string; slots: { start: string; doctorId: string | null; doctor: string | null }[] };
 
 /** What a tool returns: `data` goes to the model, `cards` go to the page. */
 export interface ToolResult {
@@ -162,6 +164,8 @@ class ToolError extends Error {
 }
 
 const MAX_DAYS = 7;
+/** Time buttons shown under a reply: enough to choose from, not a wall. */
+const MAX_SLOT_BUTTONS = 8;
 const MAX_SLOTS_PER_DAY = 16;
 /** How many times to offer around a time the patient asked about. */
 const NEAR_SLOTS = 4;
@@ -288,6 +292,7 @@ export class ClinicToolsService {
     const doctorId = args.doctor ? await this.doctorId(args.doctor) : undefined;
 
     const days = [];
+    const choices: { start: string; doctorId: string | null; doctor: string | null }[] = [];
     for (let day = from; day <= to; day = day.plus({ days: 1 })) {
       const { slots, names } = await this.availability.getSlots({
         typeCode: args.type!,
@@ -310,8 +315,19 @@ export class ClinicToolsService {
         slots: shown.map((s) => ({ ...this.times(s.start, timezone, who.viewerTimezone), doctor: examDoctor(s, names)?.displayName ?? null })),
         more: matching.length - shown.length,
       });
+      for (const s of shown) {
+        const doctor = examDoctor(s, names);
+        choices.push({ start: s.start.toISOString(), doctorId: doctor?.id ?? null, doctor: doctor?.displayName ?? null });
+      }
     }
-    return { data: { clinic_timezone: timezone, viewer_timezone: who.viewerTimezone, days } };
+    // Logged-in patients get the times as buttons (built here from the real free times, not
+    // by the model). Guests can't book, so they get none.
+    const type = who.patientId ? await this.prisma.appointmentType.findUnique({ where: { code: args.type! } }) : null;
+    const cards: Card[] =
+      type && choices.length > 0
+        ? [{ type: 'slot_choices', typeCode: type.code, typeName: type.name, slots: choices.slice(0, MAX_SLOT_BUTTONS) }]
+        : [];
+    return { data: { clinic_timezone: timezone, viewer_timezone: who.viewerTimezone, days }, cards };
   }
 
   /**
