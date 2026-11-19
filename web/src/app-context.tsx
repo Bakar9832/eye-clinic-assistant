@@ -20,7 +20,16 @@ interface AppState {
   connection: Connection;
   /** Try again now (the Retry button). */
   retryConnection: () => void;
+  /**
+   * The agent service (separate from the API, and it sleeps on free hosting): 'online'
+   * when its /health answered recently, 'waking' otherwise.
+   */
+  agent: AgentStatus;
+  /** Checks again until the agent is online or `maxMs` has passed; true if it is online. */
+  waitForAgent: (maxMs: number) => Promise<boolean>;
 }
+
+export type AgentStatus = 'online' | 'waking';
 
 export type Connection = 'ok' | 'waking' | 'unreachable';
 
@@ -28,6 +37,15 @@ export type Connection = 'ok' | 'waking' | 'unreachable';
 const REQUEST_TIMEOUT_MS = 25_000;
 const WAKING_AFTER_MS = 3_000;
 const UNREACHABLE_AFTER_FAILURES = 3;
+/** How often to ask about the agent: often while it wakes, rarely once it's up. */
+const AGENT_CHECK_WAKING_MS = 5_000;
+const AGENT_CHECK_ONLINE_MS = 60_000;
+
+/** GET /chat/warm: the API pings the agent's /health and says how it is. No login, no model call. */
+const agentStatusQuery = {
+  queryKey: ['agent-status'],
+  queryFn: () => api<{ agent: AgentStatus }>('/chat/warm', { timeoutMs: 15_000 }),
+};
 
 /**
  * Connection problems (time-out, no network, 5xx) are retried for as long as it takes,
@@ -82,6 +100,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void queryClient.refetchQueries({ queryKey: ['me'] });
     void queryClient.refetchQueries({ queryKey: ['clinic'] });
   }, [queryClient]);
+
+  // Sent on app load (any page), so the agent starts waking while the patient reads.
+  const agentStatus = useQuery({
+    ...agentStatusQuery,
+    refetchInterval: (q) => (q.state.data?.agent === 'online' ? AGENT_CHECK_ONLINE_MS : AGENT_CHECK_WAKING_MS),
+    ...keepTrying,
+  });
+  const agent: AgentStatus = agentStatus.data?.agent ?? 'waking';
+  const waitForAgent = useCallback(
+    async (maxMs: number) => {
+      const deadline = Date.now() + maxMs;
+      for (;;) {
+        if (queryClient.getQueryData<{ agent: AgentStatus }>(agentStatusQuery.queryKey)?.agent === 'online') return true;
+        if (Date.now() >= deadline) return false;
+        try {
+          const fresh = await queryClient.fetchQuery({ ...agentStatusQuery, staleTime: 0, retry: false });
+          if (fresh.agent === 'online') return true;
+        } catch {
+          // not answering yet; ask again shortly
+        }
+        await new Promise((resolve) => setTimeout(resolve, Math.min(3_000, Math.max(0, deadline - Date.now()))));
+      }
+    },
+    [queryClient],
+  );
+
   const [chosenZone, setChosenZone] = useState<string | null>(readStoredZone);
 
   // Which zone to show times in: this browser's choice, else the patient's saved one
@@ -116,8 +160,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       refreshMe,
       connection,
       retryConnection,
+      agent,
+      waitForAgent,
     }),
-    [clinic.data, me.isPending, me.data, viewerZone, setViewerZone, refreshMe, connection, retryConnection],
+    [clinic.data, me.isPending, me.data, viewerZone, setViewerZone, refreshMe, connection, retryConnection, agent, waitForAgent],
   );
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

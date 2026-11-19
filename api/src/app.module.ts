@@ -81,7 +81,8 @@ import { StaffGuard } from './staff/staff.guard.js';
     // Swapped for fakes in tests.
     { provide: Clock, useClass: SystemClock },
     { provide: EmailSender, useFactory: () => emailSenderFromEnv() },
-    { provide: AgentClient, useClass: HttpAgentClient },
+    // A factory: HttpAgentClient's constructor takes optional test seams, not Nest providers.
+    { provide: AgentClient, useFactory: () => new HttpAgentClient() },
     { provide: APP_FILTER, useClass: SchedulingErrorFilter },
     { provide: APP_PIPE, useFactory: createValidationPipe },
   ],

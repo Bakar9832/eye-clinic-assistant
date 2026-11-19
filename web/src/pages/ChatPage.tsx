@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowUp, CalendarCheck, CalendarClock, CalendarPlus, Clock, FileText, ListChecks, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import { api, ApiError, errorText } from '../api/client';
+import { api, ApiError, errorText, isConnectionProblem } from '../api/client';
 import type { Card, ChatReply, Ticket } from '../api/types';
 import { useApp } from '../app-context';
 import { CardView, type Offer } from '../components/cards';
@@ -13,6 +13,8 @@ interface Bubble {
   role: 'user' | 'assistant' | 'error';
   text: string;
   cards?: Card[];
+  /** On an error the patient can retry: sends the same request again. */
+  retry?: () => void;
 }
 
 /** Sent after the secure box confirms the date of birth. The date itself never enters the chat. */
@@ -31,12 +33,15 @@ const QUICK_ACTIONS: { label: string; message: string; icon: LucideIcon; loggedI
 ];
 
 const SLOW_REPLY_MS = 8_000;
+/** How long to wait for a sleeping agent before sending anyway (the API then waits and retries too). */
+const AGENT_WAKE_WAIT_MS = 75_000;
+export const WAKING_TEXT = 'Waking up the assistant, this can take up to a minute';
 
 const GREETING =
   "Hi! I can check free times, book, move or cancel appointments, and tell you when your results are in. What can I do for you?";
 
 export function ChatPage() {
-  const { me, viewerZone } = useApp();
+  const { me, viewerZone, agent, waitForAgent } = useApp();
   // Each visitor (or patient) has their own conversation in this browser tab.
   const storageKey = `conversation:${me?.email ?? 'anonymous'}`;
   const [conversationId, setConversationId] = useState<string | null>(() => sessionStorage.getItem(storageKey));
@@ -49,11 +54,6 @@ export function ChatPage() {
   // was wiped when the login check answered (seen on a cold start). So wait for it.
   const connecting = me === undefined;
 
-  // Wake the agent service while the patient is still reading (free hosting sleeps).
-  useEffect(() => {
-    void api('/chat/warm', { method: 'POST' }).catch(() => undefined);
-  }, []);
-
   useEffect(() => {
     setConversationId(sessionStorage.getItem(storageKey));
     setBubbles([]);
@@ -65,17 +65,34 @@ export function ChatPage() {
     void end.current?.scrollIntoView({ behavior: 'smooth' });
   }, [bubbles]);
 
-  /** Shows the patient's side at once, then the reply (or what went wrong) when it arrives. */
-  async function exchange(text: string, request: () => Promise<ChatReply>) {
-    setBubbles((b) => [...b, { role: 'user', text }]);
+  /**
+   * Shows the patient's side at once, then the reply (or what went wrong) when it arrives.
+   * If the agent is asleep, first waits (up to 75 s) for it to wake, on short status checks,
+   * so the chat request itself isn't the one left waiting.
+   */
+  async function exchange(text: string, request: () => Promise<ChatReply>, showText = true) {
+    if (showText) setBubbles((b) => [...b, { role: 'user', text }]);
     setBusy(true);
     // A reply this slow is usually the service waking up: say so, so it isn't taken for a failure.
     const slowTimer = setTimeout(() => setSlow(true), SLOW_REPLY_MS);
     try {
+      if (agent !== 'online') {
+        setSlow(true);
+        await waitForAgent(AGENT_WAKE_WAIT_MS);
+      }
       const reply = await request();
       setBubbles((b) => [...b, { role: 'assistant', text: reply.reply, cards: reply.cards }]);
     } catch (err) {
-      setBubbles((b) => [...b, { role: 'error', text: errorText(err) }]);
+      // The API already waited and retried once; offer another try and a way round the chat.
+      const canRetry = isConnectionProblem(err) || (err instanceof ApiError && err.code === 'AGENT_UNAVAILABLE');
+      const bubble: Bubble = { role: 'error', text: errorText(err) };
+      if (canRetry) {
+        bubble.retry = () => {
+          setBubbles((b) => b.filter((x) => x !== bubble));
+          void exchange(text, request, false);
+        };
+      }
+      setBubbles((b) => [...b, bubble]);
     } finally {
       clearTimeout(slowTimer);
       setSlow(false);
@@ -171,6 +188,23 @@ export function ChatPage() {
           {bubbles.map((bubble, i) => (
             <div key={i} className="space-y-3">
               <Message role={bubble.role} text={bubble.text} />
+              {bubble.retry && i === bubbles.length - 1 && !busy && (
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={bubble.retry}
+                    className="min-h-11 rounded-lg bg-ink px-4 font-medium text-white hover:bg-slate-800"
+                  >
+                    Try again
+                  </button>
+                  <Link
+                    to="/calendar"
+                    className="inline-flex min-h-11 items-center rounded-lg border border-line bg-white px-4 font-medium text-ink hover:bg-surface"
+                  >
+                    Book without the assistant
+                  </Link>
+                </div>
+              )}
               {bubble.cards?.map((card, j) => (
                 <div key={j} className="max-w-xl">
                   <CardView
@@ -219,7 +253,7 @@ export function ChatPage() {
   );
 }
 
-/** Three dots while the assistant answers; after 8 s it says the service is waking up. */
+/** Three dots while the assistant answers; while it wakes (or after 8 s) it says so. */
 function Typing({ slow }: { slow: boolean }) {
   return (
     <div className="flex items-center gap-3 text-sm text-ink-muted">
@@ -228,7 +262,7 @@ function Typing({ slow }: { slow: boolean }) {
           <span key={delay} className="size-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: `${delay}ms` }} />
         ))}
       </span>
-      <span className={slow ? '' : 'sr-only'}>{slow ? 'Waking up the assistant: the first reply can take up to a minute…' : 'The assistant is typing'}</span>
+      <span className={slow ? '' : 'sr-only'}>{slow ? `${WAKING_TEXT}…` : 'The assistant is typing'}</span>
     </div>
   );
 }

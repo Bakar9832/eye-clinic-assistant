@@ -28,33 +28,105 @@ export interface AgentTurnResponse {
   cards: Card[];
 }
 
+/** Whether the agent service answered recently ('online') or is probably asleep ('waking'). */
+export type AgentStatus = 'online' | 'waking';
+
 /** Runs one turn of the agent. The real one is the Python service; tests use a fake. */
 export abstract class AgentClient {
   abstract turn(request: AgentTurnRequest): Promise<AgentTurnResponse>;
 
-  /** Wakes a sleeping agent service (free hosting) before the first message. Never throws. */
+  /** Pings the agent's /health so a sleeping service starts waking. Never throws. */
   async warm(): Promise<void> {}
+
+  /** Fakes are always awake. */
+  status(): AgentStatus {
+    return 'online';
+  }
 }
 
-/** Calls the Python agent service over HTTP (Slice 3b). */
+/** Free hosting puts the agent to sleep after 15 quiet minutes; 10 is a safe "still awake". */
+const AWAKE_FOR_MS = 10 * 60_000;
+const isRetryable = (error: unknown) =>
+  error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError' || error instanceof TypeError);
+
+export interface HttpAgentDeps {
+  fetch: typeof fetch;
+  now: () => number;
+  /** A signal that aborts after `ms` (replaceable in tests to see the time limit used). */
+  timeout: (ms: number) => AbortSignal;
+  env: NodeJS.ProcessEnv;
+}
+
+/**
+ * Calls the Python agent service over HTTP. On free hosting it may be asleep and take
+ * about a minute to wake, so:
+ * - the first turn after a quiet spell gets a longer time limit (AGENT_COLD_TIMEOUT_MS,
+ *   70 s) than a turn to an agent that answered recently (AGENT_TIMEOUT_MS, 45 s);
+ * - a connection error or time-out is retried once (with the long limit); an error answer
+ *   from the agent is not;
+ * - warm() pings /health with a short limit (AGENT_PING_TIMEOUT_MS, 10 s): enough to
+ *   start a sleeping service; a success marks the agent as awake.
+ */
 @Injectable()
 export class HttpAgentClient extends AgentClient {
-  private readonly url = requireEnv('AGENT_URL');
-  private readonly key = requireEnv('AGENT_SERVICE_KEY');
+  private readonly url: string;
+  private readonly key: string;
+  private readonly turnTimeoutMs: number;
+  private readonly coldTimeoutMs: number;
+  private readonly pingTimeoutMs: number;
+  private readonly deps: HttpAgentDeps;
+  private lastAnsweredAt = 0;
+  private ping: Promise<void> | null = null;
+
+  constructor(deps: Partial<HttpAgentDeps> = {}) {
+    super();
+    this.deps = { fetch: (...a) => fetch(...a), now: () => Date.now(), timeout: (ms) => AbortSignal.timeout(ms), env: process.env, ...deps };
+    const env = this.deps.env;
+    this.url = env.AGENT_URL ?? requireEnv('AGENT_URL');
+    this.key = env.AGENT_SERVICE_KEY ?? requireEnv('AGENT_SERVICE_KEY');
+    this.turnTimeoutMs = Number(env.AGENT_TIMEOUT_MS ?? 45_000);
+    this.coldTimeoutMs = Number(env.AGENT_COLD_TIMEOUT_MS ?? 70_000);
+    this.pingTimeoutMs = Number(env.AGENT_PING_TIMEOUT_MS ?? 10_000);
+  }
+
+  status(): AgentStatus {
+    return this.deps.now() - this.lastAnsweredAt < AWAKE_FOR_MS ? 'online' : 'waking';
+  }
 
   async turn(request: AgentTurnRequest): Promise<AgentTurnResponse> {
-    const res = await fetch(`${this.url}/turn`, {
+    const first = this.status() === 'online' ? this.turnTimeoutMs : this.coldTimeoutMs;
+    try {
+      return await this.attempt(request, first);
+    } catch (error) {
+      if (!isRetryable(error)) throw error;
+      return this.attempt(request, this.coldTimeoutMs);
+    }
+  }
+
+  warm(): Promise<void> {
+    // One ping at a time: many page loads at once don't each send one.
+    this.ping ??= this.deps
+      .fetch(`${this.url}/health`, { signal: this.deps.timeout(this.pingTimeoutMs) })
+      .then((res) => {
+        if (res.ok) this.lastAnsweredAt = this.deps.now();
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        this.ping = null;
+      });
+    return this.ping;
+  }
+
+  private async attempt(request: AgentTurnRequest, timeoutMs: number): Promise<AgentTurnResponse> {
+    const res = await this.deps.fetch(`${this.url}/turn`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Agent-Service-Key': this.key },
       body: JSON.stringify(request),
-      signal: AbortSignal.timeout(90_000),
+      signal: this.deps.timeout(timeoutMs),
     });
     if (!res.ok) throw new Error(`Agent service answered ${res.status}`);
-    return (await res.json()) as AgentTurnResponse;
-  }
-
-  async warm(): Promise<void> {
-    // Its health check is enough to start a sleeping service; the answer doesn't matter.
-    await fetch(`${this.url}/health`, { signal: AbortSignal.timeout(90_000) }).catch(() => undefined);
+    const answer = (await res.json()) as AgentTurnResponse;
+    this.lastAnsweredAt = this.deps.now();
+    return answer;
   }
 }

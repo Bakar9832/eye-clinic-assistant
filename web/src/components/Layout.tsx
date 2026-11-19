@@ -128,10 +128,13 @@ export function Layout() {
   );
 }
 
-/** A small dot: green when the clinic API answers, amber while it is waking up or unreachable. */
+/**
+ * A small dot: green when the API answers and the agent's /health answered recently;
+ * amber "Waking up" otherwise (either one can be asleep on free hosting).
+ */
 function AssistantStatus() {
-  const { connection, clinic } = useApp();
-  const online = connection === 'ok' && Boolean(clinic);
+  const { connection, clinic, agent } = useApp();
+  const online = connection === 'ok' && Boolean(clinic) && agent === 'online';
   return (
     <span className="hidden items-center gap-1.5 text-sm text-ink-muted sm:inline-flex">
       <span aria-hidden className={`size-2 rounded-full ${online ? 'bg-success' : 'bg-warning'}`} />

@@ -43,6 +43,7 @@ export function mockApi(routes: Record<string, Handler>) {
   const all: Record<string, Handler> = {
     'GET /clinic': { body: CLINIC },
     'GET /me': { status: 401, body: { error: 'UNAUTHENTICATED', reasons: [] } },
+    'GET /chat/warm': { body: { agent: 'online' } },
     ...routes,
   };
   vi.stubGlobal(

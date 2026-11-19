@@ -113,6 +113,8 @@ describe('the chat', () => {
     mockApi({ 'POST /chat': { status: 429, body: { error: 'RATE_LIMITED', reasons: [] } } });
     renderApp('/');
     await say('Hello');
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull(); // waiting is the fix, not retrying
     expect(await screen.findByRole('alert')).toHaveTextContent('wait a few minutes');
   });
 
@@ -159,12 +161,6 @@ describe('the chat', () => {
       expect(api.calls.find((c) => c.path === '/chat')?.body).toMatchObject({ message: 'Hello there' });
     });
 
-    it('opening the chat wakes the agent service', async () => {
-      const api = mockApi({ 'GET /me': { body: DEMO } });
-      renderApp('/');
-      await waitFor(() => expect(api.calls.some((c) => c.method === 'POST' && c.path === '/chat/warm')).toBe(true));
-    });
-
     it('free times come as buttons; a tap books that time through the API', async () => {
       const start = '2030-01-07T05:00:00.000Z';
       const api = mockApi({
@@ -188,6 +184,66 @@ describe('the chat', () => {
 
       expect(await screen.findByRole('region', { name: 'Booking ticket' })).toHaveTextContent('EC-ABC123');
       expect(api.calls.find((c) => c.path === '/chat/conv-1/book')?.body).toEqual({ typeCode: 'FOLLOW_UP', start, doctorId: 'doc-1' });
+    });
+  });
+
+  describe('W-WAKE. a sleeping agent service (free hosting)', () => {
+    it('W-WAKE1. loading any page sends one light warm-up request; an awake agent shows "Assistant online"', async () => {
+      const api = mockApi({});
+      renderApp('/calendar');
+      expect(await screen.findByText('Assistant online')).toBeInTheDocument();
+      const warm = api.calls.filter((c) => c.path === '/chat/warm');
+      expect(warm).toHaveLength(1);
+      expect(warm[0]).toMatchObject({ method: 'GET', body: undefined }); // no login data, no message
+      expect(api.calls.some((c) => c.path === '/chat')).toBe(false); // no model call
+    });
+
+    it('W-WAKE2. while the agent wakes: amber "Waking up", and a message waits (with the waking note) instead of failing', async () => {
+      let awake = false;
+      const api = mockApi({
+        'GET /chat/warm': () => ({ body: { agent: awake ? 'online' : 'waking' } }),
+        'POST /chat': { body: { conversationId: 'conv-1', reply: 'Good morning!', cards: [] } },
+      });
+      renderApp('/');
+      expect(await screen.findByText('Waking up')).toBeInTheDocument();
+
+      await say('Hello');
+      expect(await screen.findByText(/Waking up the assistant, this can take up to a minute/)).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(api.calls.some((c) => c.path === '/chat')).toBe(false); // held back until the agent is up
+
+      awake = true;
+      expect(await screen.findByText('Good morning!', {}, { timeout: 6_000 })).toBeInTheDocument();
+      expect(await screen.findByText('Assistant online', {}, { timeout: 6_000 })).toBeInTheDocument();
+    }, 15_000);
+
+    it('W-WAKE3. if it still fails (after the API retried): the error, Try again (same message) and Book without the assistant', async () => {
+      let tries = 0;
+      const api = mockApi({
+        'POST /chat': () =>
+          ++tries === 1
+            ? { status: 503, body: { error: 'AGENT_UNAVAILABLE', reasons: [] } }
+            : { body: { conversationId: 'conv-1', reply: 'Here now.', cards: [] } },
+      });
+      renderApp('/');
+      await say('Hello');
+
+      expect(await screen.findByRole('alert')).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: 'Book without the assistant' })).toHaveAttribute('href', '/calendar');
+      await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+
+      expect(await screen.findByText('Here now.')).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+      expect(screen.getAllByText('Hello')).toHaveLength(1); // not shown twice
+      expect(api.calls.filter((c) => c.path === '/chat').map((c) => c.body?.message)).toEqual(['Hello', 'Hello']);
+    });
+
+    it('W-WAKE4. a connection failure (502) gets the same buttons (a real answer such as "too many requests" does not: W14b)', async () => {
+      mockApi({ 'POST /chat': { status: 502, body: {} } });
+      renderApp('/');
+      await say('Hello');
+      expect(await screen.findByRole('button', { name: 'Try again' })).toBeInTheDocument();
     });
   });
 
