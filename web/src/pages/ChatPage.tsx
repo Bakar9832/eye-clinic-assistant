@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { api, ApiError, errorText, isConnectionProblem } from '../api/client';
 import type { Card, ChatReply, Ticket } from '../api/types';
 import { useApp } from '../app-context';
+import { AssistantText } from '../components/AssistantText';
 import { CardView, type Offer } from '../components/cards';
 import { Skeleton } from '../components/Skeleton';
 import { TimeText } from '../components/TimeText';
@@ -320,12 +321,13 @@ function NextAppointment() {
 }
 
 function Message({ role, text }: { role: Bubble['role']; text: string }) {
+  // The assistant's replies may use light markdown (rendered safely); the patient's own
+  // words and error messages stay plain text.
+  if (role === 'assistant') return <AssistantText text={text} />;
   const style =
     role === 'user'
       ? 'ml-auto max-w-[85%] rounded-xl bg-slate-100 px-4 py-2.5 text-ink'
-      : role === 'error'
-        ? 'max-w-[85%] rounded-xl border border-red-200 bg-danger-soft px-4 py-2.5 text-red-800'
-        : 'max-w-full text-ink';
+      : 'max-w-[85%] rounded-xl border border-red-200 bg-danger-soft px-4 py-2.5 text-red-800';
   return (
     <p role={role === 'error' ? 'alert' : undefined} className={`w-fit whitespace-pre-wrap leading-relaxed ${style}`}>
       {text}
