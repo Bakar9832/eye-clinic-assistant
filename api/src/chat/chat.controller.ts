@@ -206,18 +206,6 @@ export class ChatController {
   }
 
   /**
-   * The web app calls this when it loads and every few seconds while the agent is waking:
-   * it starts a health ping to the agent (free hosting puts it to sleep) and says whether
-   * the agent answered recently. Waits at most 1.5 s for the ping, so it always answers
-   * quickly. No login, no patient data, no model call.
-   */
-  @Get('warm')
-  async warm() {
-    await Promise.race([this.agent.warm(), new Promise((resolve) => setTimeout(resolve, 1_500))]);
-    return { agent: this.agent.status() };
-  }
-
-  /**
    * The "Request a call back" button. Like Confirm, the click is the request: no model in
    * between. Both sides go into the conversation so the agent knows on its next turn.
    */

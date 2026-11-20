@@ -1,7 +1,7 @@
 # Deploying the live demo (free tiers)
 
 ```
-Browser ──► Vercel (web app; passes /auth /me /chat /clinic /availability /appointment-types /staff on)
+Browser ──► Vercel (web app; passes /auth /me /chat /clinic /availability /appointment-types /staff /health on)
                  │
                  ▼
             Render: eye-clinic-api (NestJS) ──► Supabase Postgres (session pooler)

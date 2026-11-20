@@ -62,6 +62,14 @@ export class FakeAgent extends AgentClient {
     return this.respond(request);
   }
 
+  /** Health pings received, and whether the next ones are answered in time. */
+  healthChecks = 0;
+  healthy = true;
+  async warm() {
+    this.healthChecks++;
+    return this.healthy;
+  }
+
   /** The agent token the API minted for the latest turn. */
   get lastToken() {
     const token = this.turns.at(-1)?.agentToken;
@@ -120,6 +128,8 @@ export async function createTestApp(prisma: PrismaClient = testPrisma()): Promis
     reset: async () => {
       inbox.sent = [];
       agent.turns = [];
+      agent.healthChecks = 0;
+      agent.healthy = true;
       agent.respond = async () => ({ reply: 'OK', cards: [] });
       clock.set(START);
       return seedClinic(prisma, ZONE);

@@ -35,8 +35,13 @@ export type AgentStatus = 'online' | 'waking';
 export abstract class AgentClient {
   abstract turn(request: AgentTurnRequest): Promise<AgentTurnResponse>;
 
-  /** Pings the agent's /health so a sleeping service starts waking. Never throws. */
-  async warm(): Promise<void> {}
+  /**
+   * Pings the agent's /health (never the model) so a sleeping service starts waking.
+   * True if it answered within the short limit. Never throws.
+   */
+  async warm(): Promise<boolean> {
+    return true;
+  }
 
   /** Fakes are always awake. */
   status(): AgentStatus {
@@ -64,7 +69,7 @@ export interface HttpAgentDeps {
  *   70 s) than a turn to an agent that answered recently (AGENT_TIMEOUT_MS, 45 s);
  * - a connection error or time-out is retried once (with the long limit); an error answer
  *   from the agent is not;
- * - warm() pings /health with a short limit (AGENT_PING_TIMEOUT_MS, 10 s): enough to
+ * - warm() pings /health with a short limit (AGENT_PING_TIMEOUT_MS, 5 s): enough to
  *   start a sleeping service; a success marks the agent as awake.
  */
 @Injectable()
@@ -76,7 +81,7 @@ export class HttpAgentClient extends AgentClient {
   private readonly pingTimeoutMs: number;
   private readonly deps: HttpAgentDeps;
   private lastAnsweredAt = 0;
-  private ping: Promise<void> | null = null;
+  private ping: Promise<boolean> | null = null;
 
   constructor(deps: Partial<HttpAgentDeps> = {}) {
     super();
@@ -86,7 +91,7 @@ export class HttpAgentClient extends AgentClient {
     this.key = env.AGENT_SERVICE_KEY ?? requireEnv('AGENT_SERVICE_KEY');
     this.turnTimeoutMs = Number(env.AGENT_TIMEOUT_MS ?? 45_000);
     this.coldTimeoutMs = Number(env.AGENT_COLD_TIMEOUT_MS ?? 70_000);
-    this.pingTimeoutMs = Number(env.AGENT_PING_TIMEOUT_MS ?? 10_000);
+    this.pingTimeoutMs = Number(env.AGENT_PING_TIMEOUT_MS ?? 5_000);
   }
 
   status(): AgentStatus {
@@ -103,14 +108,16 @@ export class HttpAgentClient extends AgentClient {
     }
   }
 
-  warm(): Promise<void> {
-    // One ping at a time: many page loads at once don't each send one.
+  warm(): Promise<boolean> {
+    // One ping at a time: many page loads (and the keep-warm pinger) share it.
     this.ping ??= this.deps
       .fetch(`${this.url}/health`, { signal: this.deps.timeout(this.pingTimeoutMs) })
       .then((res) => {
         if (res.ok) this.lastAnsweredAt = this.deps.now();
+        return res.ok;
       })
-      .catch(() => undefined)
+      // A cold agent doesn't answer in time. That's fine: the request already woke it.
+      .catch(() => false)
       .finally(() => {
         this.ping = null;
       });

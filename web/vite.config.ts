@@ -8,7 +8,7 @@ const API = process.env.API_URL ?? 'http://localhost:3000';
 // The browser talks to one site. Requests for these API paths are passed on to the
 // clinic API, so its cookies are first-party and no cross-site (CORS) setup is needed.
 // Page routes (/, /calendar, /my, /results, /profile, /login, /admin) never use these prefixes.
-const apiPaths = ['auth', 'me', 'chat', 'clinic', 'availability', 'appointment-types', 'staff'];
+const apiPaths = ['auth', 'me', 'chat', 'clinic', 'availability', 'appointment-types', 'staff', 'health'];
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],

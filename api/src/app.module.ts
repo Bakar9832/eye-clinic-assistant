@@ -5,6 +5,7 @@ import { AdminController } from './admin/admin.controller.js';
 import { AgentTokenService } from './agent/agent-token.service.js';
 import { AgentClient, HttpAgentClient } from './chat/agent-client.js';
 import { ChatController } from './chat/chat.controller.js';
+import { HealthController } from './health/health.controller.js';
 import { ClinicToolsService } from './mcp/clinic-tools.service.js';
 import { McpController } from './mcp/mcp.controller.js';
 import { OffersService } from './offers/offers.service.js';
@@ -57,6 +58,7 @@ import { StaffGuard } from './staff/staff.guard.js';
     AdminController,
     McpController,
     ChatController,
+    HealthController,
   ],
   providers: [
     AvailabilityService,
