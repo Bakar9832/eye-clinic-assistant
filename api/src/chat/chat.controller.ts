@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Logger, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Logger, Param, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { IsOptional, IsString, IsUUID, Length, Validate } from 'class-validator';
 import type { Request, Response } from 'express';
 import { createHash, randomBytes } from 'node:crypto';
@@ -21,6 +21,7 @@ import { checkStalled } from '../guardrails/stalling.js';
 import { flagIfUrgentConversation, screenMessage } from '../guardrails/urgent.js';
 import { AgentClient } from './agent-client.js';
 import { redactDateOfBirth } from './redact.js';
+import { ClientIp } from '../http/client-ip.js';
 
 const CHAT_LIMIT = { messages: 20, windowMinutes: 10 };
 const MAX_MESSAGE_CHARS = 1000;
@@ -72,7 +73,7 @@ export class ChatController {
 
   @Post()
   @HttpCode(HttpStatus.OK)
-  async send(@Body() body: ChatDto, @Req() req: Request, @Res({ passthrough: true }) res: Response, @Ip() ip: string) {
+  async send(@Body() body: ChatDto, @Req() req: Request, @Res({ passthrough: true }) res: Response, @ClientIp() ip: string) {
     const owner = await this.owner(req, res);
     const now = this.clock.now();
 

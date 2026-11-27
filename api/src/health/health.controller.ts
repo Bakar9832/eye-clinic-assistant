@@ -1,5 +1,7 @@
-import { Controller, Get, Header } from '@nestjs/common';
+import { Controller, Get, Header, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { AgentClient } from '../chat/agent-client.js';
+import { verifiedIp } from '../http/client-ip.js';
 
 /**
  * Keep-warm: one cheap URL that an external pinger (and the web app's status dot) can call
@@ -19,5 +21,16 @@ export class HealthController {
   async warm(): Promise<{ api: 'ok'; agent: 'ok' | 'waking' }> {
     const answered = await this.agent.warm();
     return { api: 'ok', agent: answered ? 'ok' : 'waking' };
+  }
+
+  /**
+   * Whether this request carried a valid signed visitor address (from the web app's edge
+   * middleware). For checking the live setup: true through the site, false when calling
+   * the API host directly. Never echoes the address itself.
+   */
+  @Get('ip')
+  @Header('Cache-Control', 'no-store')
+  ip(@Req() req: Request): { verified: boolean } {
+    return { verified: verifiedIp(req) !== null };
   }
 }

@@ -23,7 +23,11 @@ services:
         value: "24"
       - key: NODE_ENV
         value: production
-      # Vercel's proxy, then Render's: two hops between the visitor and the API.
+      # The visitor's address comes signed from the web app's edge middleware (see
+      # api/src/http/client-ip.ts). Set the same random value on Vercel. Without it the
+      # API falls back to counting proxies, which doesn't work behind this chain.
+      - key: PROXY_SHARED_SECRET
+        sync: false
       - key: TRUST_PROXY_HOPS
         value: "2"
       - key: DATABASE_URL

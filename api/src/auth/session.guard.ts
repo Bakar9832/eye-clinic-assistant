@@ -3,6 +3,7 @@ import type { Request } from 'express';
 import type { Actor } from '../audit/audit.service.js';
 import { httpError } from '../http/http-error.js';
 import { AuthService } from './auth.service.js';
+import { clientIp } from '../http/client-ip.js';
 
 export const SESSION_COOKIE = 'session';
 
@@ -36,5 +37,5 @@ export class SessionGuard implements CanActivate {
 export const CurrentPatient = createParamDecorator((_: unknown, context: ExecutionContext): PatientActor => {
   const req = context.switchToHttp().getRequest<AuthenticatedRequest>();
   if (!req.patientId || !req.sessionId) throw new Error('CurrentPatient used on a route without SessionGuard');
-  return { type: 'PATIENT', id: req.patientId, ip: req.ip, sessionId: req.sessionId };
+  return { type: 'PATIENT', id: req.patientId, ip: clientIp(req), sessionId: req.sessionId };
 });

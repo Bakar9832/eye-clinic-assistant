@@ -1,8 +1,9 @@
-import { Body, Controller, HttpCode, HttpStatus, Ip, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { LoginDto, RequestCodeDto, SetPasswordDto } from './auth.dto.js';
 import { AuthService, type NewSession } from './auth.service.js';
 import { SESSION_COOKIE } from './session.guard.js';
+import { ClientIp } from '../http/client-ip.js';
 
 @Controller('auth')
 export class AuthController {
@@ -10,7 +11,7 @@ export class AuthController {
 
   @Post('request-code')
   @HttpCode(HttpStatus.ACCEPTED)
-  async requestCode(@Body() body: RequestCodeDto, @Ip() ip: string) {
+  async requestCode(@Body() body: RequestCodeDto, @ClientIp() ip: string) {
     await this.auth.requestCode(body.email, ip);
     return { message: 'If that address can receive email, a code is on its way.' };
   }
@@ -18,21 +19,21 @@ export class AuthController {
   /** Sign-up or forgot password: the emailed code, then the new password. Logs in. */
   @Post('set-password')
   @HttpCode(HttpStatus.OK)
-  async setPassword(@Body() body: SetPasswordDto, @Ip() ip: string, @Res({ passthrough: true }) res: Response) {
+  async setPassword(@Body() body: SetPasswordDto, @ClientIp() ip: string, @Res({ passthrough: true }) res: Response) {
     setSessionCookie(res, await this.auth.setPassword(body.email, body.code, body.password, ip, body));
     return { loggedIn: true };
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() body: LoginDto, @Ip() ip: string, @Res({ passthrough: true }) res: Response) {
+  async login(@Body() body: LoginDto, @ClientIp() ip: string, @Res({ passthrough: true }) res: Response) {
     setSessionCookie(res, await this.auth.login(body.email, body.password, ip, 'PATIENT'));
     return { loggedIn: true };
   }
 
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async logout(@Req() req: Request, @Ip() ip: string, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: Request, @ClientIp() ip: string, @Res({ passthrough: true }) res: Response) {
     await this.auth.logout(req.cookies?.[SESSION_COOKIE], ip);
     res.clearCookie(SESSION_COOKIE, { path: '/' });
   }
