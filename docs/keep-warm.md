@@ -19,10 +19,14 @@ wake. The API and the agent are separate services, so a visitor can hit two cold
 
 ## The plan
 
-An external free scheduler (for example a cron-job service or a scheduled CI job) calls
-the endpoint **every 10 minutes**, comfortably under the 15-minute sleep timer.
+A scheduled GitHub Actions workflow (`.github/workflows/keep-warm.yml`) calls the
+endpoint **every 10 minutes**, comfortably under the 15-minute sleep timer. The URL is the
+repository variable `KEEP_WARM_URL`, not in the code. Actions minutes are free for a public
+repository. Known quirks: GitHub can run scheduled jobs late at busy times (a service may
+then sleep briefly), and it pauses schedules in a repository with no activity for 60 days.
 
-**US daytime only**, about 11 hours a day (for example 09:00–20:00 US Eastern), because
+**US daytime only**, 11 hours a day (14:00–00:59 UTC: 10:00–21:00 US Eastern in summer,
+09:00–20:00 in winter, so no change is needed when the clocks change), because
 the free plan has 750 instance hours a month for the whole workspace, shared by both
 services:
 
@@ -32,5 +36,4 @@ services:
 | 11 h a day | about 680: leaves room for visits outside the window |
 
 Outside the window the services sleep as before, and the web app shows "Waking up the
-assistant" while they start. Schedulers usually work in UTC: move the window by an hour
-when US daylight saving starts and ends.
+assistant" while they start.
