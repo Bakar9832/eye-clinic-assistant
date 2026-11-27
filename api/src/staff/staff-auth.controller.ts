@@ -1,9 +1,10 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Ip, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { LoginDto } from '../auth/auth.dto.js';
 import { AuthService } from '../auth/auth.service.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { CurrentStaff, STAFF_COOKIE, StaffGuard, type StaffActor } from './staff.guard.js';
+import { ClientIp } from '../http/client-ip.js';
 
 /**
  * The staff door: email + password, with its own cookie and sessions. No sign-up and no
@@ -18,7 +19,7 @@ export class StaffAuthController {
 
   @Post('auth/login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() body: LoginDto, @Ip() ip: string, @Res({ passthrough: true }) res: Response) {
+  async login(@Body() body: LoginDto, @ClientIp() ip: string, @Res({ passthrough: true }) res: Response) {
     const session = await this.auth.login(body.email, body.password, ip, 'STAFF');
     res.cookie(STAFF_COOKIE, session.token, {
       httpOnly: true,
@@ -32,7 +33,7 @@ export class StaffAuthController {
 
   @Post('auth/logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async logout(@Req() req: Request, @Ip() ip: string, @Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: Request, @ClientIp() ip: string, @Res({ passthrough: true }) res: Response) {
     await this.auth.logout(req.cookies?.[STAFF_COOKIE], ip);
     res.clearCookie(STAFF_COOKIE, { path: '/staff' });
   }

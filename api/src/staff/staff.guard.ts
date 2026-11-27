@@ -6,6 +6,7 @@ import type { Actor } from '../audit/audit.service.js';
 import { AuthService } from '../auth/auth.service.js';
 import type { StaffRole } from '../generated/prisma/client.js';
 import { httpError } from '../http/http-error.js';
+import { clientIp } from '../http/client-ip.js';
 
 /** Sent only to /staff routes (cookie Path), so patient pages never carry it. */
 export const STAFF_COOKIE = 'staff_session';
@@ -50,7 +51,7 @@ export class StaffGuard implements CanActivate {
       id: session.staffUser.id,
       role: session.staffUser.role,
       resourceId: session.staffUser.resourceId,
-      ip: req.ip,
+      ip: clientIp(req),
     };
     return true;
   }
