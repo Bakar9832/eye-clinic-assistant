@@ -224,12 +224,3 @@ describe('C. Confirm on a booking offer: the click books, not the model', () => 
     expect(await t.prisma.appointment.count()).toBe(0);
   });
 });
-
-describe('waking the agent', () => {
-  it('GET /chat/warm answers quickly, without login, with the agent status (no model call)', async () => {
-    const turns = t.agent.turns.length;
-    const res = await t.http().get('/chat/warm').expect(200);
-    expect(res.body).toEqual({ agent: 'online' }); // the test agent is always awake
-    expect(t.agent.turns.length).toBe(turns);
-  });
-});

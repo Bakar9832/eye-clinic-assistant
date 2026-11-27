@@ -11,6 +11,7 @@
     { "source": "/availability/:path*", "destination": "https://eye-clinic-api-3frf.onrender.com/availability/:path*" },
     { "source": "/appointment-types/:path*", "destination": "https://eye-clinic-api-3frf.onrender.com/appointment-types/:path*" },
     { "source": "/staff/:path*", "destination": "https://eye-clinic-api-3frf.onrender.com/staff/:path*" },
+    { "source": "/health/:path*", "destination": "https://eye-clinic-api-3frf.onrender.com/health/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

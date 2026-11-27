@@ -41,10 +41,16 @@ const UNREACHABLE_AFTER_FAILURES = 3;
 const AGENT_CHECK_WAKING_MS = 5_000;
 const AGENT_CHECK_ONLINE_MS = 60_000;
 
-/** GET /chat/warm: the API pings the agent's /health and says how it is. No login, no model call. */
+/**
+ * GET /health/warm (the keep-warm URL): the API pings the agent's /health with a 5 s limit
+ * and says whether it answered. No login, no model call. 'online' only when both say ok.
+ */
 const agentStatusQuery = {
   queryKey: ['agent-status'],
-  queryFn: () => api<{ agent: AgentStatus }>('/chat/warm', { timeoutMs: 15_000 }),
+  queryFn: async (): Promise<{ agent: AgentStatus }> => {
+    const health = await api<{ api: string; agent: string }>('/health/warm', { timeoutMs: 15_000 });
+    return { agent: health.api === 'ok' && health.agent === 'ok' ? 'online' : 'waking' };
+  },
 };
 
 /**

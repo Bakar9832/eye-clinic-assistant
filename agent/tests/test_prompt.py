@@ -53,3 +53,8 @@ def test_guardrail_rules_are_in_the_prompt():
     assert "earliest URGENT_VISIT" not in prompt
     # Times are tappable buttons on the page: no bulleted lists of them.
     assert "never as a bulleted list" in prompt
+
+
+def test_prompt_asks_for_light_formatting_only():
+    # The web renders light markdown (bold, lists); headings and tables would look heavy.
+    assert "No headings, no tables." in build_system_prompt(context())

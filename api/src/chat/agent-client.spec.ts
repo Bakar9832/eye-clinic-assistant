@@ -59,13 +59,13 @@ describe('the agent client on a free-tier host that sleeps', () => {
     expect(urls).toHaveLength(1);
   });
 
-  it('AW5. warm() pings /health with a short limit; an answer marks the agent awake, so turns use the normal limit', async () => {
+  it('AW5. warm() pings /health (never /turn) with a 5 s limit; an answer marks the agent awake, so turns use the normal limit', async () => {
     const { agent, limits, urls } = client([() => Promise.resolve(new Response('{"status":"ok"}')), () => Promise.resolve(ok({ reply: 'Hi', cards: [] }))]);
-    await agent.warm();
-    expect(urls[0]).toBe('http://agent/health');
+    await expect(agent.warm()).resolves.toBe(true);
+    expect(urls).toEqual(['http://agent/health']);
     expect(agent.status()).toBe('online');
     await agent.turn(REQUEST);
-    expect(limits).toEqual([10_000, 45_000]);
+    expect(limits).toEqual([5_000, 45_000]);
   });
 
   it('AW6. after 10 quiet minutes the agent counts as asleep again; a failed ping changes nothing', async () => {
@@ -73,8 +73,14 @@ describe('the agent client on a free-tier host that sleeps', () => {
     await agent.warm();
     advance(10 * 60_000 + 1);
     expect(agent.status()).toBe('waking');
-    await agent.warm(); // refused: never throws
+    await expect(agent.warm()).resolves.toBe(false); // refused: never throws
     expect(agent.status()).toBe('waking');
+  });
+
+  it('AW6b. a cold agent that misses the 5 s limit: warm() says false, without throwing or waiting longer', async () => {
+    const { agent, limits } = client([timedOut]);
+    await expect(agent.warm()).resolves.toBe(false);
+    expect(limits).toEqual([5_000]);
   });
 
   it('AW7. the limits are settings', async () => {

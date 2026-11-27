@@ -192,7 +192,7 @@ describe('the chat', () => {
       const api = mockApi({});
       renderApp('/calendar');
       expect(await screen.findByText('Assistant online')).toBeInTheDocument();
-      const warm = api.calls.filter((c) => c.path === '/chat/warm');
+      const warm = api.calls.filter((c) => c.path === '/health/warm');
       expect(warm).toHaveLength(1);
       expect(warm[0]).toMatchObject({ method: 'GET', body: undefined }); // no login data, no message
       expect(api.calls.some((c) => c.path === '/chat')).toBe(false); // no model call
@@ -201,7 +201,7 @@ describe('the chat', () => {
     it('W-WAKE2. while the agent wakes: amber "Waking up", and a message waits (with the waking note) instead of failing', async () => {
       let awake = false;
       const api = mockApi({
-        'GET /chat/warm': () => ({ body: { agent: awake ? 'online' : 'waking' } }),
+        'GET /health/warm': () => ({ body: { api: 'ok', agent: awake ? 'ok' : 'waking' } }),
         'POST /chat': { body: { conversationId: 'conv-1', reply: 'Good morning!', cards: [] } },
       });
       renderApp('/');
